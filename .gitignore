@@ -1,2 +1,5 @@
 mobile/android/app/google-services.json
 backend/secrets/
+# Firebase secret — KHÔNG commit lên GitHub
+secrets/
+node_modules

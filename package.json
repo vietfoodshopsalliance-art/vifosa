@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "firebase-admin": "^13.9.0",
+    "jsonwebtoken": "^9.0.3"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
+    "mongodb-memory-server": "^11.1.0"
+  }
+}
