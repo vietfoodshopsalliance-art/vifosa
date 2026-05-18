@@ -14,15 +14,16 @@ export async function loginAction(identifier: string, password: string) {
   const data = await res.json()
   const roles: string[] = data?.data?.user?.roles ?? []
   const username: string = data?.data?.user?.username ?? ''
+  const storeId: string = data?.data?.user?.storeId ?? ''
 
   if (!roles.includes('admin') && !roles.includes('store_owner') && !roles.includes('mod')) {
     return { error: 'Tài khoản không có quyền truy cập dashboard.' }
   }
 
-  // Encode roles+username in a short-lived token and redirect through /api/auth-callback.
+  // Encode roles+username+storeId in a short-lived token and redirect through /api/auth-callback.
   // The Route Handler sets Set-Cookie + redirects in one response, guaranteeing the browser
   // commits cookies before navigating — unlike Server Action cookies().set() which is unreliable.
-  const payload = { roles, username, exp: Date.now() + 30_000 }
+  const payload = { roles, username, storeId, exp: Date.now() + 30_000 }
   const token = Buffer.from(JSON.stringify(payload)).toString('base64url')
   return { redirect: `/api/auth-callback?t=${encodeURIComponent(token)}` }
 }

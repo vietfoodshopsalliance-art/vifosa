@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const payload: { roles: string[]; username: string; exp: number } = JSON.parse(
+    const payload: { roles: string[]; username: string; storeId?: string; exp: number } = JSON.parse(
       Buffer.from(token, 'base64url').toString('utf-8'),
     )
 
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${origin}/login`)
     }
 
-    const { roles, username } = payload
+    const { roles, username, storeId } = payload
     if (!roles.includes('admin') && !roles.includes('store_owner') && !roles.includes('mod')) {
       return NextResponse.redirect(`${origin}/login`)
     }
@@ -36,6 +36,11 @@ export async function GET(request: Request) {
     response.cookies.set('userName', username, {
       path: '/', maxAge: 1800, sameSite: 'lax', secure, httpOnly: false,
     })
+    if (storeId) {
+      response.cookies.set('storeId', storeId, {
+        path: '/', maxAge: 1800, sameSite: 'lax', secure, httpOnly: false,
+      })
+    }
     return response
   } catch {
     return NextResponse.redirect(`${origin}/login`)

@@ -5,23 +5,9 @@ import StoreMenuEditor from '@/components/store/StoreMenuEditor'
 
 export const metadata: Metadata = { title: 'Quản lý Menu — Vifosa' }
 
-async function getStoreId(): Promise<string | null> {
-  const cookieStore = await cookies()
-  try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/me`, {
-      headers: { Cookie: cookieStore.toString() },
-      cache: 'no-store',
-    })
-    if (!res.ok) return null
-    const me = await res.json()
-    return me.storeId ?? null
-  } catch {
-    return null
-  }
-}
-
 export default async function StoreMenuPage() {
-  const storeId = await getStoreId()
+  const cookieStore = await cookies()
+  const storeId = cookieStore.get('storeId')?.value
   if (!storeId) redirect('/login')
 
   return (
