@@ -1,4 +1,8 @@
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
+// Client-side: route through Next.js rewrite proxy (/_api → Render) to avoid CORS.
+// Server-side: call Render directly (no CORS constraint).
+const API = typeof window !== 'undefined'
+  ? '/_api'
+  : (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080')
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
