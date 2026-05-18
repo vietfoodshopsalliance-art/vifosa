@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     const destination = roles.includes('admin') ? `${origin}/admin` : `${origin}/store`
 
     const response = NextResponse.redirect(destination)
-    response.cookies.set('userRoles', roles.join(','), {
+    response.cookies.set('userRoles', roles.join('|'), {
       path: '/', maxAge: 1800, sameSite: 'lax', secure, httpOnly: true,
     })
     response.cookies.set('userName', username, {
