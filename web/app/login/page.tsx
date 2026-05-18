@@ -1,11 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { loginAction } from './actions'
 
 export default function LoginPage() {
-  const router = useRouter()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -18,13 +16,10 @@ export default function LoginPage() {
 
     try {
       const result = await loginAction(identifier, password)
-      if (result.error) {
+      if (result?.error) {
         setError(result.error)
-        return
       }
-      if (result.redirect) {
-        router.push(result.redirect)
-      }
+      // On success, redirect() in the Server Action navigates the browser
     } catch {
       setError('Có lỗi xảy ra. Vui lòng thử lại.')
     } finally {

@@ -1,6 +1,7 @@
 'use server'
 
 import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 
 export async function loginAction(identifier: string, password: string) {
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
@@ -17,11 +18,17 @@ export async function loginAction(identifier: string, password: string) {
   const roles: string[] = data?.data?.user?.roles ?? []
   const username: string = data?.data?.user?.username ?? ''
 
-  const cookieStore = await cookies()
-  cookieStore.set('userRoles', roles.join(','), { path: '/', maxAge: 1800, sameSite: 'lax' })
-  cookieStore.set('userName', username, { path: '/', maxAge: 1800, sameSite: 'lax' })
+  if (!roles.includes('admin') && !roles.includes('store_owner') && !roles.includes('mod')) {
+    return { error: 'Tài khoản không có quyền truy cập dashboard.' }
+  }
 
-  if (roles.includes('admin')) return { redirect: '/admin' }
-  if (roles.includes('store_owner') || roles.includes('mod')) return { redirect: '/store' }
-  return { error: 'Tài khoản không có quyền truy cập dashboard.' }
+  const cookieStore = await cookies()
+  const secure = process.env.NODE_ENV === 'production'
+  cookieStore.set('userRoles', roles.join(','), { path: '/', maxAge: 1800, sameSite: 'lax', secure })
+  cookieStore.set('userName', username, { path: '/', maxAge: 1800, sameSite: 'lax', secure })
+
+  // redirect() throws internally — cookies are committed in the same response
+  // before the browser follows the redirect, guaranteeing they're present on /admin or /store
+  if (roles.includes('admin')) redirect('/admin')
+  redirect('/store')
 }
