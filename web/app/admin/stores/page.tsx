@@ -33,6 +33,7 @@ export default function AdminStoresPage() {
   const [actionMsg, setActionMsg] = useState('')
   const [transferModal, setTransferModal] = useState<Store | null>(null)
   const [newOwner, setNewOwner]   = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<Store | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -66,6 +67,16 @@ export default function AdminStoresPage() {
       await api.post(`/admin/stores/bulk`, { ids, action })
       setActionMsg(`Đã thực hiện: ${action} (${ids.length} quán).`)
       setSelected(new Set())
+      load()
+    } catch { setActionMsg('Có lỗi xảy ra.') }
+  }
+
+  async function deleteStore() {
+    if (!deleteTarget) return
+    try {
+      await api.delete(`/admin/stores/${deleteTarget._id}`)
+      setActionMsg(`Đã xoá quán "${deleteTarget.name}".`)
+      setDeleteTarget(null)
       load()
     } catch { setActionMsg('Có lỗi xảy ra.') }
   }
@@ -116,6 +127,12 @@ export default function AdminStoresPage() {
             <button onClick={() => bulkAction('lock_ad')} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100">Tắt đăng tin</button>
             <button onClick={() => bulkAction('unlock_ad')} className="rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-800 hover:bg-green-100">Mở đăng tin</button>
             <button onClick={() => bulkAction('suspend')} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100">Khoá bán hàng</button>
+            <button
+              onClick={() => { if (confirm(`Xoá ${selected.size} quán đã chọn? Không thể hoàn tác.`)) bulkAction('delete') }}
+              className="rounded-lg border border-red-300 bg-red-100 px-3 py-1.5 text-xs font-bold text-red-900 hover:bg-red-200"
+            >
+              Xoá quán
+            </button>
           </div>
         )}
       </div>
@@ -170,6 +187,12 @@ export default function AdminStoresPage() {
                     >
                       Chuyển nhượng
                     </button>
+                    <button
+                      onClick={() => setDeleteTarget(s)}
+                      className="rounded-lg border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                    >
+                      Xoá
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -177,6 +200,32 @@ export default function AdminStoresPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Delete confirm modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="mb-2 text-base font-bold text-[#1A1200]">Xoá quán: {deleteTarget.name}</h2>
+            <p className="mb-6 text-sm text-[#6B5C3E]">
+              Quán sẽ bị ẩn hoàn toàn khỏi hệ thống. Hành động này không thể hoàn tác.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="flex-1 rounded-lg border border-gray-200 py-2 text-sm"
+              >
+                Huỷ
+              </button>
+              <button
+                onClick={deleteStore}
+                className="flex-1 rounded-lg bg-red-600 py-2 text-sm font-semibold text-white hover:bg-red-700"
+              >
+                Xác nhận xoá
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Transfer modal */}
       {transferModal && (
