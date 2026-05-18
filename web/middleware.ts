@@ -2,14 +2,14 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export function middleware(request: NextRequest) {
-  const token = request.cookies.get('accessToken')?.value
   const { pathname } = request.nextUrl
+  // accessToken is scoped to the backend domain (onrender.com) — never visible here.
+  // userRoles is set by the web app after successful login and serves as the session signal.
+  const roles = request.cookies.get('userRoles')?.value ?? ''
 
-  if (!token) {
+  if (!roles) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
-
-  const roles = request.cookies.get('userRoles')?.value ?? ''
 
   if (pathname.startsWith('/admin') && !roles.includes('admin')) {
     return NextResponse.redirect(new URL('/login', request.url))
