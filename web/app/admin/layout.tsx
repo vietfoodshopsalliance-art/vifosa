@@ -13,7 +13,7 @@ const NAV = [
   { href: '/admin/settings',  label: 'Cài đặt' },
 ]
 
-// Auth is enforced by proxy.ts — no cookies() call here to avoid
+// Auth is enforced by middleware.ts — no cookies() call here to avoid
 // implicit Set-Cookie side effects in Next.js 16 server component rendering
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
