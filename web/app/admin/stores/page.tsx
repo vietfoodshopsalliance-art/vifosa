@@ -34,6 +34,7 @@ export default function AdminStoresPage() {
   const [transferModal, setTransferModal] = useState<Store | null>(null)
   const [newOwner, setNewOwner]   = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Store | null>(null)
+  const [deleteError, setDeleteError]   = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -73,12 +74,13 @@ export default function AdminStoresPage() {
 
   async function deleteStore() {
     if (!deleteTarget) return
+    setDeleteError('')
     try {
       await api.delete(`/admin/stores/${deleteTarget._id}`)
       setActionMsg(`Đã xoá quán "${deleteTarget.name}".`)
       setDeleteTarget(null)
       load()
-    } catch { setActionMsg('Có lỗi xảy ra.') }
+    } catch (e: any) { setDeleteError(e?.message ?? 'Có lỗi xảy ra.') }
   }
 
   async function transfer() {
@@ -206,12 +208,15 @@ export default function AdminStoresPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
             <h2 className="mb-2 text-base font-bold text-[#1A1200]">Xoá quán: {deleteTarget.name}</h2>
-            <p className="mb-6 text-sm text-[#6B5C3E]">
+            <p className="mb-4 text-sm text-[#6B5C3E]">
               Quán sẽ bị ẩn hoàn toàn khỏi hệ thống. Hành động này không thể hoàn tác.
             </p>
+            {deleteError && (
+              <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{deleteError}</p>
+            )}
             <div className="flex gap-3">
               <button
-                onClick={() => setDeleteTarget(null)}
+                onClick={() => { setDeleteTarget(null); setDeleteError('') }}
                 className="flex-1 rounded-lg border border-gray-200 py-2 text-sm"
               >
                 Huỷ
