@@ -40,9 +40,12 @@ export default function LoginPage() {
       const roles: string[] = loginData?.data?.user?.roles ?? []
       const username: string = loginData?.data?.user?.username ?? ''
 
-      // Lưu roles và username vào cookie để middleware và layout đọc (không sensitive)
-      document.cookie = `userRoles=${roles.join(',')}; path=/; max-age=1800; SameSite=Lax`
-      document.cookie = `userName=${username}; path=/; max-age=1800; SameSite=Lax`
+      // Set cookies server-side để tránh bị Next.js override
+      await fetch('/api/set-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roles, username }),
+      })
 
       if (roles.includes('admin')) {
         router.push('/admin')
