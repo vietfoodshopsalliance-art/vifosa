@@ -1,5 +1,4 @@
 import { cookies } from 'next/headers'
-import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import StoreMenuEditor from '@/components/store/StoreMenuEditor'
 
@@ -27,7 +26,6 @@ export default async function AdminStoreMenuPage({
 }) {
   const { storeId } = await params
   const store = await getStore(storeId)
-  if (!store) notFound()
 
   return (
     <div>
@@ -36,7 +34,7 @@ export default async function AdminStoreMenuPage({
         <span className="text-lg">⚠️</span>
         <p className="flex-1 text-sm font-semibold">
           Bạn đang thao tác với tư cách ADMIN trên quán:{' '}
-          <span className="font-bold">{store.name}</span>
+          <span className="font-bold">{store?.name ?? storeId}</span>
         </p>
         <Link
           href="/admin/stores"
