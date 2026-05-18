@@ -1,4 +1,3 @@
-import { cookies } from 'next/headers'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 
@@ -13,10 +12,10 @@ const MOCK_STATS = {
 }
 
 async function getDashboardStats() {
-  const cookieStore = await cookies()
   try {
+    // Backend auth uses accessToken cookie (onrender.com domain) — not available here.
+    // Fall back to mock stats until GET /admin/dashboard-stats is implemented.
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/dashboard-stats`, {
-      headers: { Cookie: cookieStore.toString() },
       cache: 'no-store',
     })
     if (res.ok) return res.json()

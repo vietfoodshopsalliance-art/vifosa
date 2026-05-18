@@ -23,8 +23,8 @@ export async function loginAction(identifier: string, password: string) {
 
   const cookieStore = await cookies()
   const secure = process.env.NODE_ENV === 'production'
-  cookieStore.set('userRoles', roles.join(','), { path: '/', maxAge: 1800, sameSite: 'lax', secure })
-  cookieStore.set('userName', username, { path: '/', maxAge: 1800, sameSite: 'lax', secure })
+  cookieStore.set('userRoles', roles.join(','), { path: '/', maxAge: 1800, sameSite: 'lax', secure, httpOnly: true })
+  cookieStore.set('userName', username, { path: '/', maxAge: 1800, sameSite: 'lax', secure, httpOnly: true })
 
   const destination = roles.includes('admin') ? '/admin' : '/store'
   return { redirect: destination }
