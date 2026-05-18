@@ -38,12 +38,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         <div className="border-t border-gray-100 p-3">
           <p className="mb-2 truncate text-xs text-[#6B5C3E]"><UserDisplay /></p>
-          <Link
-            href="/api/logout"
-            className="block rounded-lg px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100"
-          >
-            Đăng xuất
-          </Link>
+          <form action="/api/logout" method="POST">
+            <button
+              type="submit"
+              className="block w-full rounded-lg px-3 py-1.5 text-left text-xs text-gray-500 hover:bg-gray-100"
+            >
+              Đăng xuất
+            </button>
+          </form>
         </div>
       </aside>
 
