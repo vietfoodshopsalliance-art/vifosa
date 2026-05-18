@@ -36,17 +36,8 @@ export default function LoginPage() {
         return
       }
 
-      const meRes = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/me`,
-        { credentials: 'include' },
-      )
-      if (!meRes.ok) {
-        setError('Không thể xác thực tài khoản. Vui lòng thử lại.')
-        return
-      }
-
-      const me = await meRes.json()
-      const roles: string[] = me?.roles ?? []
+      const loginData = await loginRes.json()
+      const roles: string[] = loginData?.data?.user?.roles ?? []
 
       // Lưu roles vào cookie để middleware đọc (không sensitive — bảo mật thực qua httpOnly token)
       document.cookie = `userRoles=${roles.join(',')}; path=/; max-age=1800; SameSite=Strict`
