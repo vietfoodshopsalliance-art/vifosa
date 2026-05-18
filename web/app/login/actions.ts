@@ -23,8 +23,10 @@ export async function loginAction(identifier: string, password: string) {
 
   const cookieStore = await cookies()
   const secure = process.env.NODE_ENV === 'production'
+  // userRoles: httpOnly — read only by proxy.ts and server components
   cookieStore.set('userRoles', roles.join(','), { path: '/', maxAge: 1800, sameSite: 'lax', secure, httpOnly: true })
-  cookieStore.set('userName', username, { path: '/', maxAge: 1800, sameSite: 'lax', secure, httpOnly: true })
+  // userName: non-httpOnly — read by client component (UserDisplay) via document.cookie
+  cookieStore.set('userName', username, { path: '/', maxAge: 1800, sameSite: 'lax', secure, httpOnly: false })
 
   const destination = roles.includes('admin') ? '/admin' : '/store'
   return { redirect: destination }

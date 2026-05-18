@@ -1,6 +1,5 @@
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { UserDisplay } from './UserDisplay'
 
 const NAV = [
   { href: '/admin',           label: 'Tổng quan' },
@@ -14,12 +13,9 @@ const NAV = [
   { href: '/admin/settings',  label: 'Cài đặt' },
 ]
 
-export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const cookieStore = await cookies()
-  const roles = cookieStore.get('userRoles')?.value ?? ''
-  const username = cookieStore.get('userName')?.value ?? 'Admin'
-  if (!roles.includes('admin')) redirect('/login')
-
+// Auth is enforced by proxy.ts — no cookies() call here to avoid
+// implicit Set-Cookie side effects in Next.js 16 server component rendering
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-[#FDFAF3]">
       <aside className="hidden w-52 flex-shrink-0 flex-col border-r border-gray-200 bg-white lg:flex">
@@ -41,7 +37,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </nav>
 
         <div className="border-t border-gray-100 p-3">
-          <p className="mb-2 truncate text-xs text-[#6B5C3E]">{username}</p>
+          <p className="mb-2 truncate text-xs text-[#6B5C3E]"><UserDisplay /></p>
           <Link
             href="/api/logout"
             className="block rounded-lg px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100"
