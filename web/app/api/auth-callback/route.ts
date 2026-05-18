@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 
   try {
     const payload: { roles: string[]; username: string; storeId?: string; exp: number } = JSON.parse(
-      Buffer.from(token, 'base64url').toString('utf-8'),
+      Buffer.from(token, 'base64').toString('utf-8'),
     )
 
     if (Date.now() > payload.exp) {

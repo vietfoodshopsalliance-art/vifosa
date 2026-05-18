@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { loginAction } from './actions'
+
+const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
 export default function LoginPage() {
   const [identifier, setIdentifier] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [password, setPassword]     = useState('')
+  const [error, setError]           = useState('')
+  const [loading, setLoading]       = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -15,18 +16,39 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const result = await loginAction(identifier, password)
-      if (result?.error) {
-        setError(result.error)
+      // Browser fetch trực tiếp → backend set httpOnly accessToken cookie lên browser
+      const res = await fetch(`${API}/auth/login`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier, password }),
+      })
+
+      if (res.status === 429) {
+        setError('Quá nhiều lần thử, vui lòng thử lại sau.')
         return
       }
-      if (result?.redirect) {
-        // Hard navigation: guarantees browser commits Set-Cookie from this
-        // Server Action response before making the next request to /admin or /store
-        window.location.href = result.redirect
+      if (!res.ok) {
+        setError('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.')
+        return
       }
+
+      const data = await res.json()
+      const roles: string[]   = data?.data?.user?.roles ?? []
+      const username: string  = data?.data?.user?.username ?? ''
+      const storeId: string   = data?.data?.user?.storeId ?? ''
+
+      if (!roles.includes('admin') && !roles.includes('store_owner') && !roles.includes('mod')) {
+        setError('Tài khoản không có quyền truy cập dashboard.')
+        return
+      }
+
+      // Gửi roles+username+storeId qua auth-callback để set web cookies, sau đó redirect
+      const payload = { roles, username, storeId, exp: Date.now() + 30_000 }
+      const token   = btoa(JSON.stringify(payload))
+      window.location.href = `/api/auth-callback?t=${encodeURIComponent(token)}`
     } catch {
-      setError('Có lỗi xảy ra. Vui lòng thử lại.')
+      setError('Không thể kết nối tới server. Vui lòng thử lại.')
     } finally {
       setLoading(false)
     }
