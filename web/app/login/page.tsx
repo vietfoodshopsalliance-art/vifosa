@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { Metadata } from 'next'
+import { loginAction } from './actions'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -17,43 +17,13 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const loginRes = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/login`,
-        {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier, password }),
-        },
-      )
-
-      if (loginRes.status === 429) {
-        setError('Quá nhiều lần thử, vui lòng thử lại sau.')
+      const result = await loginAction(identifier, password)
+      if (result.error) {
+        setError(result.error)
         return
       }
-      if (!loginRes.ok) {
-        setError('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.')
-        return
-      }
-
-      const loginData = await loginRes.json()
-      const roles: string[] = loginData?.data?.user?.roles ?? []
-      const username: string = loginData?.data?.user?.username ?? ''
-
-      // Set cookies server-side để tránh bị Next.js override
-      await fetch('/api/set-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roles, username }),
-      })
-
-      if (roles.includes('admin')) {
-        router.push('/admin')
-      } else if (roles.includes('store_owner') || roles.includes('mod')) {
-        router.push('/store')
-      } else {
-        setError('Tài khoản không có quyền truy cập dashboard.')
-        document.cookie = 'userRoles=; path=/; max-age=0'
+      if (result.redirect) {
+        router.push(result.redirect)
       }
     } catch {
       setError('Có lỗi xảy ra. Vui lòng thử lại.')
