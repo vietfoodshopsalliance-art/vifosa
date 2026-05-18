@@ -38,9 +38,11 @@ export default function LoginPage() {
 
       const loginData = await loginRes.json()
       const roles: string[] = loginData?.data?.user?.roles ?? []
+      const username: string = loginData?.data?.user?.username ?? ''
 
-      // Lưu roles vào cookie để middleware đọc (không sensitive — bảo mật thực qua httpOnly token)
+      // Lưu roles và username vào cookie để middleware và layout đọc (không sensitive)
       document.cookie = `userRoles=${roles.join(',')}; path=/; max-age=1800; SameSite=Strict`
+      document.cookie = `userName=${username}; path=/; max-age=1800; SameSite=Strict`
 
       if (roles.includes('admin')) {
         router.push('/admin')
