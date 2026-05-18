@@ -1,7 +1,6 @@
 'use server'
 
 import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
 
 export async function loginAction(identifier: string, password: string) {
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
@@ -27,8 +26,6 @@ export async function loginAction(identifier: string, password: string) {
   cookieStore.set('userRoles', roles.join(','), { path: '/', maxAge: 1800, sameSite: 'lax', secure })
   cookieStore.set('userName', username, { path: '/', maxAge: 1800, sameSite: 'lax', secure })
 
-  // redirect() throws internally — cookies are committed in the same response
-  // before the browser follows the redirect, guaranteeing they're present on /admin or /store
-  if (roles.includes('admin')) redirect('/admin')
-  redirect('/store')
+  const destination = roles.includes('admin') ? '/admin' : '/store'
+  return { redirect: destination }
 }

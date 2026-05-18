@@ -18,8 +18,13 @@ export default function LoginPage() {
       const result = await loginAction(identifier, password)
       if (result?.error) {
         setError(result.error)
+        return
       }
-      // On success, redirect() in the Server Action navigates the browser
+      if (result?.redirect) {
+        // Hard navigation: guarantees browser commits Set-Cookie from this
+        // Server Action response before making the next request to /admin or /store
+        window.location.href = result.redirect
+      }
     } catch {
       setError('Có lỗi xảy ra. Vui lòng thử lại.')
     } finally {
