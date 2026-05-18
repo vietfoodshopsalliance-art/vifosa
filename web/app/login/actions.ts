@@ -1,7 +1,5 @@
 'use server'
 
-import { cookies } from 'next/headers'
-
 export async function loginAction(identifier: string, password: string) {
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
     method: 'POST',
@@ -21,13 +19,10 @@ export async function loginAction(identifier: string, password: string) {
     return { error: 'Tài khoản không có quyền truy cập dashboard.' }
   }
 
-  const cookieStore = await cookies()
-  const secure = process.env.NODE_ENV === 'production'
-  // userRoles: httpOnly — read only by proxy.ts and server components
-  cookieStore.set('userRoles', roles.join(','), { path: '/', maxAge: 1800, sameSite: 'lax', secure, httpOnly: true })
-  // userName: non-httpOnly — read by client component (UserDisplay) via document.cookie
-  cookieStore.set('userName', username, { path: '/', maxAge: 1800, sameSite: 'lax', secure, httpOnly: false })
-
-  const destination = roles.includes('admin') ? '/admin' : '/store'
-  return { redirect: destination }
+  // Encode roles+username in a short-lived token and redirect through /api/auth-callback.
+  // The Route Handler sets Set-Cookie + redirects in one response, guaranteeing the browser
+  // commits cookies before navigating — unlike Server Action cookies().set() which is unreliable.
+  const payload = { roles, username, exp: Date.now() + 30_000 }
+  const token = Buffer.from(JSON.stringify(payload)).toString('base64url')
+  return { redirect: `/api/auth-callback?t=${encodeURIComponent(token)}` }
 }
