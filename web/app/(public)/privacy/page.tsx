@@ -5,12 +5,13 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Chính sách bảo mật — Vifosa' }
 
-export const revalidate = 3600
+export const dynamic = 'force-dynamic'
 
 async function getContent(): Promise<{ value: string; updatedAt?: string } | null> {
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/settings/privacy_content`, {
-      next: { revalidate: 3600 },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(5000),
     })
     if (!res.ok) return null
     return res.json()
