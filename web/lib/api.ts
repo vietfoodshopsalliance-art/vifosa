@@ -1,7 +1,7 @@
-// Client-side: route through Next.js rewrite proxy (/_api → Render) to avoid CORS.
-// Server-side: call Render directly (no CORS constraint).
+// Client-side: route through /api/proxy (Next.js API route, same origin, no CORS).
+// Server-side: call Render directly.
 const API = typeof window !== 'undefined'
-  ? '/_api'
+  ? '/api/proxy'
   : (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080')
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'

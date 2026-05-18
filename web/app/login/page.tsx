@@ -34,13 +34,23 @@ export default function LoginPage() {
       }
 
       const data = await res.json()
-      const roles: string[]   = data?.data?.user?.roles ?? []
-      const username: string  = data?.data?.user?.username ?? ''
-      const storeId: string   = data?.data?.user?.storeId ?? ''
+      const roles: string[]        = data?.data?.user?.roles ?? []
+      const username: string       = data?.data?.user?.username ?? ''
+      const storeId: string        = data?.data?.user?.storeId ?? ''
+      const accessToken: string    = data?.data?.accessToken ?? ''
 
       if (!roles.includes('admin') && !roles.includes('store_owner') && !roles.includes('mod')) {
         setError('Tài khoản không có quyền truy cập dashboard.')
         return
+      }
+
+      // Lưu accessToken vào cookie Vercel-domain để proxy dùng
+      if (accessToken) {
+        await fetch('/api/set-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accessToken }),
+        })
       }
 
       // Gửi roles+username+storeId qua auth-callback để set web cookies, sau đó redirect

@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
-  const { roles, username } = await request.json()
+  const { accessToken } = await request.json()
   const res = NextResponse.json({ ok: true })
-  const opts = { path: '/', maxAge: 1800, sameSite: 'lax' as const, httpOnly: false }
-  res.cookies.set('userRoles', Array.isArray(roles) ? roles.join(',') : '', opts)
-  res.cookies.set('userName', username ?? '', opts)
+  const secure = process.env.NODE_ENV === 'production'
+  if (accessToken) {
+    res.cookies.set('accessToken', accessToken, {
+      path: '/', maxAge: 900, sameSite: 'lax', secure, httpOnly: true,
+    })
+  }
   return res
 }
