@@ -62,10 +62,10 @@ export default function AdminSettingsPage() {
   async function save(key: string) {
     setSaving(key)
     try {
-      await api.put(`/admin/settings/${key}`, { value: values[key] })
+      await api.patch('/admin/settings', { [key]: values[key] })
       setDirty((prev) => { const next = new Set(prev); next.delete(key); return next })
       setActionMsg(`Đã lưu: ${key}`)
-    } catch { setActionMsg('Lưu thất bại.') }
+    } catch (e: any) { setActionMsg(e?.message ?? 'Lưu thất bại.') }
     finally { setSaving(null) }
   }
 

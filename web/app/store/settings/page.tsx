@@ -31,26 +31,44 @@ const DEFAULT_SCHEDULE: WeekSchedule = Object.fromEntries(
 
 const BANKS = ['Vietcombank','Techcombank','BIDV','Agribank','MB Bank','TPBank','VPBank','ACB','Sacombank','HDBank']
 
+function getCookie(name: string): string {
+  if (typeof document === 'undefined') return ''
+  const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'))
+  return match ? decodeURIComponent(match[1]) : ''
+}
+
 export default function StoreSettingsPage() {
-  const [form, setForm]         = useState<Partial<StoreSettings>>({})
-  const [loading, setLoading]   = useState(true)
-  const [saving, setSaving]     = useState(false)
+  const [storeId, setStoreId]     = useState('')
+  const [form, setForm]           = useState<Partial<StoreSettings>>({})
+  const [loading, setLoading]     = useState(true)
+  const [error, setError]         = useState('')
+  const [saving, setSaving]       = useState(false)
   const [actionMsg, setActionMsg] = useState('')
-  const [isMod, setIsMod]       = useState(false)
+  const [isMod, setIsMod]         = useState(false)
   const [transferModal, setTransferModal] = useState(false)
-  const [newOwner, setNewOwner] = useState('')
+  const [newOwner, setNewOwner]   = useState('')
 
   useEffect(() => {
     async function load() {
+      const sid = getCookie('storeId')
+      setStoreId(sid)
+      setError('')
       try {
-        const [settingsRes, meRes] = await Promise.all([
-          api.get<StoreSettings>('/store/settings'),
+        const [storesRes, meRes] = await Promise.all([
+          api.get<{ stores: StoreSettings[] }>('/me/stores'),
           api.get<{ roles: string[] }>('/me'),
         ])
-        setForm({ ...settingsRes, schedule: settingsRes.schedule ?? DEFAULT_SCHEDULE })
+        const store = sid
+          ? storesRes.stores.find((s) => s._id === sid) ?? storesRes.stores[0]
+          : storesRes.stores[0]
+        if (store) {
+          setStoreId(store._id)
+          setForm({ ...store, schedule: store.schedule ?? DEFAULT_SCHEDULE })
+        }
         setIsMod(meRes.roles?.includes('mod') ?? false)
-      } catch {}
-      finally { setLoading(false) }
+      } catch (e: any) {
+        setError(e?.message ?? 'Lỗi kết nối. Vui lòng thử lại.')
+      } finally { setLoading(false) }
     }
     load()
   }, [])
@@ -60,24 +78,31 @@ export default function StoreSettingsPage() {
   }
 
   async function save() {
+    if (!storeId) return
     setSaving(true)
     try {
-      await api.put('/store/settings', form)
+      await api.patch(`/stores/${storeId}`, form)
       setActionMsg('Đã lưu cài đặt.')
-    } catch { setActionMsg('Lưu thất bại.') }
+    } catch (e: any) { setActionMsg(e?.message ?? 'Lưu thất bại.') }
     finally { setSaving(false) }
   }
 
   async function transfer() {
-    if (!newOwner.trim()) return
+    if (!newOwner.trim() || !storeId) return
     try {
-      await api.post('/store/transfer', { username: newOwner.trim() })
+      await api.post(`/stores/${storeId}/transfer`, { username: newOwner.trim() })
       setActionMsg('Đã chuyển nhượng quán. Bạn sẽ mất quyền truy cập.')
       setTransferModal(false)
-    } catch { setActionMsg('Chuyển nhượng thất bại.') }
+    } catch (e: any) { setActionMsg(e?.message ?? 'Chuyển nhượng thất bại.') }
   }
 
   if (loading) return <div className="p-6 text-[#6B5C3E]">Đang tải...</div>
+
+  if (error) return (
+    <div className="p-6">
+      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+    </div>
+  )
 
   const schedule = (form.schedule ?? DEFAULT_SCHEDULE) as WeekSchedule
 

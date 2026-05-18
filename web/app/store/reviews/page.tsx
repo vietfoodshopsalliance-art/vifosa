@@ -17,27 +17,43 @@ interface Review {
 
 type Filter = 'all' | 'unreplied' | 'replied' | '1' | '2' | '3' | '4' | '5'
 
+function getCookie(name: string): string {
+  if (typeof document === 'undefined') return ''
+  const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'))
+  return match ? decodeURIComponent(match[1]) : ''
+}
+
 export default function StoreReviewsPage() {
-  const [reviews, setReviews]   = useState<Review[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [filter, setFilter]     = useState<Filter>('all')
+  const [storeId, setStoreId]     = useState('')
+  const [reviews, setReviews]     = useState<Review[]>([])
+  const [loading, setLoading]     = useState(true)
+  const [error, setError]         = useState('')
+  const [filter, setFilter]       = useState<Filter>('all')
   const [replyModal, setReplyModal] = useState<Review | null>(null)
-  const [reply, setReply]       = useState('')
-  const [saving, setSaving]     = useState(false)
+  const [reply, setReply]         = useState('')
+  const [saving, setSaving]       = useState(false)
   const [actionMsg, setActionMsg] = useState('')
 
+  useEffect(() => {
+    setStoreId(getCookie('storeId'))
+  }, [])
+
   const load = useCallback(async () => {
+    if (!storeId) return
     setLoading(true)
+    setError('')
     try {
       const params = new URLSearchParams({ limit: '20' })
       if (filter === 'unreplied') params.set('replied', 'false')
       else if (filter === 'replied') params.set('replied', 'true')
       else if (['1','2','3','4','5'].includes(filter)) params.set('rating', filter)
-      const res = await api.get<{ reviews: Review[] }>(`/store/reviews?${params}`)
+      const res = await api.get<{ reviews: Review[] }>(`/stores/${storeId}/reviews?${params}`)
       setReviews(res.reviews)
-    } catch { setReviews([]) }
-    finally { setLoading(false) }
-  }, [filter])
+    } catch (e: any) {
+      setReviews([])
+      setError(e?.message ?? 'Lỗi kết nối. Vui lòng thử lại.')
+    } finally { setLoading(false) }
+  }, [storeId, filter])
 
   useEffect(() => { load() }, [load])
 
@@ -45,12 +61,12 @@ export default function StoreReviewsPage() {
     if (!replyModal || !reply.trim()) return
     setSaving(true)
     try {
-      await api.post(`/store/reviews/${replyModal._id}/reply`, { reply })
+      await api.post(`/reviews/${replyModal._id}/reply`, { text: reply })
       setActionMsg('Đã gửi phản hồi.')
       setReplyModal(null)
       setReply('')
       load()
-    } catch { setActionMsg('Gửi phản hồi thất bại.') }
+    } catch (e: any) { setActionMsg(e?.message ?? 'Gửi phản hồi thất bại.') }
     finally { setSaving(false) }
   }
 
@@ -58,12 +74,12 @@ export default function StoreReviewsPage() {
     if (!replyModal || !reply.trim()) return
     setSaving(true)
     try {
-      await api.patch(`/store/reviews/${replyModal._id}/reply`, { reply })
+      await api.patch(`/reviews/${replyModal._id}/reply`, { text: reply })
       setActionMsg('Đã cập nhật phản hồi.')
       setReplyModal(null)
       setReply('')
       load()
-    } catch { setActionMsg('Cập nhật thất bại.') }
+    } catch (e: any) { setActionMsg(e?.message ?? 'Cập nhật thất bại.') }
     finally { setSaving(false) }
   }
 
@@ -108,7 +124,12 @@ export default function StoreReviewsPage() {
       {/* Review list */}
       <div className="space-y-3">
         {loading && <p className="text-center text-sm text-[#6B5C3E]">Đang tải...</p>}
-        {!loading && reviews.length === 0 && <p className="text-center text-sm text-[#6B5C3E]">Không có đánh giá nào.</p>}
+        {!loading && error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error} <button className="ml-2 underline" onClick={load}>Thử lại</button>
+          </div>
+        )}
+        {!loading && !error && reviews.length === 0 && <p className="text-center text-sm text-[#6B5C3E]">Không có đánh giá nào.</p>}
         {reviews.map((r) => (
           <div key={r._id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <div className="flex items-start justify-between gap-2">

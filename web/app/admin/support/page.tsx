@@ -30,17 +30,21 @@ export default function AdminSupportPage() {
   const [status, setStatus]   = useState<TicketStatus>('open')
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState('')
   const [selected, setSelected] = useState<Ticket | null>(null)
   const [reply, setReply]     = useState('')
   const [actionMsg, setActionMsg] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError('')
     try {
-      const res = await api.get<{ tickets: Ticket[] }>(`/admin/support?status=${status}&limit=20`)
+      const res = await api.get<{ tickets: Ticket[] }>(`/admin/support/tickets?status=${status}&limit=20`)
       setTickets(res.tickets)
-    } catch { setTickets([]) }
-    finally { setLoading(false) }
+    } catch (e: any) {
+      setTickets([])
+      setError(e?.message ?? 'Lỗi kết nối. Vui lòng thử lại.')
+    } finally { setLoading(false) }
   }, [status])
 
   useEffect(() => { load() }, [load])
@@ -48,21 +52,21 @@ export default function AdminSupportPage() {
   async function sendReply() {
     if (!selected || !reply.trim()) return
     try {
-      await api.post(`/admin/support/${selected._id}/reply`, { reply })
+      await api.patch(`/admin/support/tickets/${selected._id}`, { adminReply: reply, status: 'replied' })
       setActionMsg('Đã gửi trả lời.')
       setSelected(null)
       setReply('')
       load()
-    } catch { setActionMsg('Có lỗi xảy ra.') }
+    } catch (e: any) { setActionMsg(e?.message ?? 'Có lỗi xảy ra.') }
   }
 
   async function closeTicket(ticket: Ticket) {
     try {
-      await api.patch(`/admin/support/${ticket._id}`, { status: 'closed' })
+      await api.patch(`/admin/support/tickets/${ticket._id}`, { status: 'closed' })
       setActionMsg('Ticket đã đóng.')
       setSelected(null)
       load()
-    } catch { setActionMsg('Có lỗi xảy ra.') }
+    } catch (e: any) { setActionMsg(e?.message ?? 'Có lỗi xảy ra.') }
   }
 
   return (
@@ -95,7 +99,12 @@ export default function AdminSupportPage() {
       {/* Ticket list */}
       <div className="space-y-3">
         {loading && <p className="text-center text-sm text-[#6B5C3E]">Đang tải...</p>}
-        {!loading && tickets.length === 0 && <p className="text-center text-sm text-[#6B5C3E]">Không có ticket nào.</p>}
+        {!loading && error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error} <button className="ml-2 underline" onClick={load}>Thử lại</button>
+          </div>
+        )}
+        {!loading && !error && tickets.length === 0 && <p className="text-center text-sm text-[#6B5C3E]">Không có ticket nào.</p>}
         {tickets.map((t) => (
           <div
             key={t._id}

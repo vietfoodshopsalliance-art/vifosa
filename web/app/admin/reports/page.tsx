@@ -27,18 +27,22 @@ export default function AdminReportsPage() {
   const [tab, setTab]             = useState('Mới')
   const [reports, setReports]     = useState<Report[]>([])
   const [loading, setLoading]     = useState(true)
+  const [error, setError]         = useState('')
   const [selected, setSelected]   = useState<Report | null>(null)
   const [resolution, setResolution] = useState('')
   const [actionMsg, setActionMsg] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError('')
     try {
       const statuses = TAB_STATUS[tab].join(',')
       const res = await api.get<{ reports: Report[] }>(`/admin/reports?status=${statuses}&limit=20`)
       setReports(res.reports)
-    } catch { setReports([]) }
-    finally { setLoading(false) }
+    } catch (e: any) {
+      setReports([])
+      setError(e?.message ?? 'Lỗi kết nối. Vui lòng thử lại.')
+    } finally { setLoading(false) }
   }, [tab])
 
   useEffect(() => { load() }, [load])
@@ -46,7 +50,7 @@ export default function AdminReportsPage() {
   async function doAction(action: 'in_review' | 'resolved' | 'rejected') {
     if (!selected) return
     try {
-      await api.patch(`/admin/reports/${selected._id}`, { status: action, resolution })
+      await api.patch(`/admin/reports/${selected._id}/status`, { status: action, resolution })
       setActionMsg(`Báo cáo đã được cập nhật: ${action}.`)
       setSelected(null)
       setResolution('')
@@ -84,7 +88,12 @@ export default function AdminReportsPage() {
       {/* List */}
       <div className="space-y-3">
         {loading && <p className="text-center text-sm text-[#6B5C3E]">Đang tải...</p>}
-        {!loading && reports.length === 0 && <p className="text-center text-sm text-[#6B5C3E]">Không có báo cáo nào.</p>}
+        {!loading && error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error} <button className="ml-2 underline" onClick={load}>Thử lại</button>
+          </div>
+        )}
+        {!loading && !error && reports.length === 0 && <p className="text-center text-sm text-[#6B5C3E]">Không có báo cáo nào.</p>}
         {reports.map((r) => (
           <div
             key={r._id}

@@ -24,20 +24,23 @@ export default function AdminUsersPage() {
   const [filter, setFilter]   = useState<'all' | 'active' | 'suspended' | 'mod'>('all')
   const [data, setData]       = useState<PageData>({ users: [] })
   const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState('')
   const [modal, setModal]     = useState<{ type: 'reset'; user: User } | null>(null)
   const [tempPw, setTempPw]   = useState('')
   const [actionMsg, setActionMsg] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError('')
     try {
       const params = new URLSearchParams({ limit: '20' })
       if (search) params.set('search', search)
       if (filter !== 'all') params.set('filter', filter)
       const res = await api.get<PageData>(`/admin/users?${params}`)
       setData(res)
-    } catch {
+    } catch (e: any) {
       setData({ users: [] })
+      setError(e?.message ?? 'Lỗi kết nối. Vui lòng thử lại.')
     } finally {
       setLoading(false)
     }
@@ -47,19 +50,20 @@ export default function AdminUsersPage() {
 
   async function toggleActive(user: User) {
     try {
-      await api.patch(`/admin/users/${user._id}`, { isActive: !user.isActive })
+      await api.patch(`/admin/users/${user._id}/suspend`, { suspend: user.isActive })
       setActionMsg(user.isActive ? 'Đã khoá tài khoản.' : 'Đã mở khoá tài khoản.')
       load()
-    } catch { setActionMsg('Có lỗi xảy ra.') }
+    } catch (e: any) { setActionMsg(e?.message ?? 'Có lỗi xảy ra.') }
   }
 
   async function toggleMod(user: User) {
     const hasMod = user.roles.includes('mod')
     try {
-      await api.patch(`/admin/users/${user._id}/roles`, { mod: !hasMod })
+      const body = hasMod ? { removeRoles: ['mod'] } : { addRoles: ['mod'] }
+      await api.patch(`/admin/users/${user._id}/roles`, body)
       setActionMsg(hasMod ? 'Đã thu hồi quyền Mod.' : 'Đã gán quyền Mod.')
       load()
-    } catch { setActionMsg('Có lỗi xảy ra.') }
+    } catch (e: any) { setActionMsg(e?.message ?? 'Có lỗi xảy ra.') }
   }
 
   async function resetPassword(user: User) {
@@ -77,6 +81,12 @@ export default function AdminUsersPage() {
       {actionMsg && (
         <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-800">
           {actionMsg} <button className="ml-2 underline" onClick={() => setActionMsg('')}>Đóng</button>
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error} <button className="ml-2 underline" onClick={load}>Thử lại</button>
         </div>
       )}
 
