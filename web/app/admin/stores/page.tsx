@@ -76,7 +76,7 @@ export default function AdminStoresPage() {
     if (!deleteTarget) return
     setDeleteError('')
     try {
-      await api.delete(`/admin/stores/${deleteTarget._id}`)
+      await api.post(`/admin/stores/bulk`, { ids: [deleteTarget._id], action: 'delete' })
       setActionMsg(`Đã xoá quán "${deleteTarget.name}".`)
       setDeleteTarget(null)
       load()
