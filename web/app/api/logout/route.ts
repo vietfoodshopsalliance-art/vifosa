@@ -19,6 +19,7 @@ export async function GET() {
 
   // Clear client-readable cookies
   res.cookies.set('userRoles', '', { maxAge: 0, path: '/' })
+  res.cookies.set('userName', '', { maxAge: 0, path: '/' })
 
   return res
 }
