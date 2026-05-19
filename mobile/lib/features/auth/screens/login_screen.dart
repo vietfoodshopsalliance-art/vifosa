@@ -1,15 +1,7 @@
-// mobile/lib/features/auth/screens/login_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
-
-const _storage = FlutterSecureStorage();
-const _kSavedIdentifier = 'saved_identifier';
-const _kSavedPassword = 'saved_password';
-const _kRememberMe = 'remember_me';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -19,71 +11,23 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _identifierCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
-  bool _obscurePassword = true;
-  bool _rememberMe = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSaved();
-  }
-
-  Future<void> _loadSaved() async {
-    final remember = await _storage.read(key: _kRememberMe);
-    if (remember != 'true') return;
-    final identifier = await _storage.read(key: _kSavedIdentifier);
-    final password = await _storage.read(key: _kSavedPassword);
-    if (identifier != null && password != null) {
-      setState(() {
-        _identifierCtrl.text = identifier;
-        _passwordCtrl.text = password;
-        _rememberMe = true;
-      });
-    }
-  }
-
-  Future<void> _persistOrClear() async {
-    if (_rememberMe) {
-      await _storage.write(key: _kRememberMe, value: 'true');
-      await _storage.write(key: _kSavedIdentifier, value: _identifierCtrl.text.trim());
-      await _storage.write(key: _kSavedPassword, value: _passwordCtrl.text);
-    } else {
-      await _storage.delete(key: _kRememberMe);
-      await _storage.delete(key: _kSavedIdentifier);
-      await _storage.delete(key: _kSavedPassword);
-    }
-  }
+  final _formKey        = GlobalKey<FormState>();
+  final _credentialCtrl = TextEditingController();
+  final _passwordCtrl   = TextEditingController();
+  bool _obscure = true;
 
   @override
   void dispose() {
-    _identifierCtrl.dispose();
+    _credentialCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    await _persistOrClear();
     await ref.read(authProvider.notifier).login(
-          identifier: _identifierCtrl.text.trim(),
-          password: _passwordCtrl.text,
-        );
-    // Navigation do router redirect guard xử lý tự động
-  }
-
-  void _showForgotDialog() {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Quên mật khẩu'),
-        content: const Text('Vui lòng liên hệ admin để được reset mật khẩu tạm thời.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Đóng')),
-        ],
-      ),
+      credential: _credentialCtrl.text.trim(),
+      password:   _passwordCtrl.text,
     );
   }
 
@@ -91,166 +35,153 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final isLoading = authState.status == AuthStatus.loading;
-    final error = authState.error;
+
+    ref.listen(authProvider, (_, next) {
+      if (next.status == AuthStatus.error && next.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next.error!),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    });
 
     return Scaffold(
-      backgroundColor: Colors.white,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           child: Form(
             key: _formKey,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 32),
-                // Logo
-                Center(
-                  child: Image.asset(
-                    'assets/images/logo.png',
-                    width: 90,
-                    height: 90,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 90,
-                      height: 90,
+                const SizedBox(height: 24),
+
+                // Logo / title
+                Row(
+                  children: [
+                    Container(
+                      width: 40, height: 40,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFEBEE),
-                        borderRadius: BorderRadius.circular(18),
+                        color: Colors.orange,
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.restaurant, size: 48, color: Color(0xFFE53935)),
+                      child: const Icon(Icons.restaurant, color: Colors.white),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Center(
-                  child: Text(
-                    'Vifosa',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFFE53935),
+                    const SizedBox(width: 12),
+                    const Text('Vifosa',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange,
+                      ),
                     ),
-                  ),
+                  ],
                 ),
                 const SizedBox(height: 40),
 
-                // Identifier
+                const Text('Đăng nhập',
+                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                const Text('Chào mừng trở lại 👋',
+                  style: TextStyle(color: Colors.grey)),
+                const SizedBox(height: 32),
+
+                // Credential
                 TextFormField(
-                  controller: _identifierCtrl,
+                  controller: _credentialCtrl,
                   decoration: const InputDecoration(
-                    labelText: 'Tên đăng nhập / Email / SĐT',
-                    prefixIcon: Icon(Icons.person_outline),
+                    labelText: 'Username / Email / SĐT',
                     border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person_outline),
                   ),
-                  textInputAction: TextInputAction.next,
                   validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Không được để trống' : null,
+                      (v == null || v.trim().isEmpty) ? 'Không được bỏ trống' : null,
                 ),
                 const SizedBox(height: 16),
 
                 // Password
                 TextFormField(
                   controller: _passwordCtrl,
-                  obscureText: _obscurePassword,
+                  obscureText: _obscure,
                   decoration: InputDecoration(
                     labelText: 'Mật khẩu',
-                    prefixIcon: const Icon(Icons.lock_outline),
                     border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
+                      icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+                      onPressed: () => setState(() => _obscure = !_obscure),
                     ),
                   ),
-                  textInputAction: TextInputAction.done,
-                  onFieldSubmitted: (_) => _submit(),
                   validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Không được để trống' : null,
+                      (v == null || v.length < 6) ? 'Mật khẩu tối thiểu 6 ký tự' : null,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
 
-                // Ghi nhớ tài khoản
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _rememberMe,
-                      activeColor: const Color(0xFFE53935),
-                      onChanged: (v) => setState(() => _rememberMe = v ?? false),
-                    ),
-                    GestureDetector(
-                      onTap: () => setState(() => _rememberMe = !_rememberMe),
-                      child: const Text('Ghi nhớ tài khoản'),
-                    ),
-                  ],
-                ),
-
-                // Lỗi từ server
-                if (error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(error,
-                        style: const TextStyle(color: Colors.red, fontSize: 13)),
+                // Quên mật khẩu — spec UA-3: MVP liên hệ admin
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => _showForgotDialog(context),
+                    child: const Text('Quên mật khẩu?'),
                   ),
-
-                const SizedBox(height: 12),
+                ),
+                const SizedBox(height: 24),
 
                 // Nút đăng nhập
                 SizedBox(
-                  height: 48,
+                  width: double.infinity,
+                  height: 50,
                   child: ElevatedButton(
                     onPressed: isLoading ? null : _submit,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFE53935),
+                      backgroundColor: Colors.orange,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                        borderRadius: BorderRadius.circular(12)),
                     ),
                     child: isLoading
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2),
-                          )
+                        ? const CircularProgressIndicator(color: Colors.white)
                         : const Text('Đăng nhập',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
-                // Đăng ký
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('Chưa có tài khoản? '),
-                    GestureDetector(
-                      onTap: () => context.go('/register'),
-                      child: const Text('Đăng ký',
-                          style: TextStyle(
-                              color: Color(0xFFE53935),
-                              fontWeight: FontWeight.w600,
-                              decoration: TextDecoration.underline)),
+                    const Text('Chưa có tài khoản?'),
+                    TextButton(
+                      onPressed: () => context.go('/register'),
+                      child: const Text('Đăng ký ngay'),
                     ),
                   ],
-                ),
-                const SizedBox(height: 12),
-
-                // Quên mật khẩu
-                Center(
-                  child: GestureDetector(
-                    onTap: _showForgotDialog,
-                    child: const Text('Quên mật khẩu?',
-                        style: TextStyle(
-                            color: Color(0xFF757575),
-                            decoration: TextDecoration.underline)),
-                  ),
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  void _showForgotDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Quên mật khẩu?'),
+        content: const Text(
+          'Vui lòng liên hệ admin để được reset mật khẩu tạm thời.\n\n'
+          'Tính năng tự reset qua email sẽ có trong phiên bản tiếp theo.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đã hiểu'),
+          ),
+        ],
       ),
     );
   }

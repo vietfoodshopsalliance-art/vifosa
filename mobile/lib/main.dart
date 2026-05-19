@@ -1,144 +1,108 @@
-// lib/main.dart
-import 'dart:ui';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'core/router/app_router.dart';
-import 'core/services/token_service.dart';
-import 'core/services/token_service_impl.dart';
-import 'core/theme/app_theme.dart';
+import 'package:go_router/go_router.dart';
 import 'features/auth/providers/auth_provider.dart';
-import 'features/notifications/providers/notification_provider.dart';
-import 'features/notifications/widgets/in_app_banner.dart';
+import 'features/auth/screens/login_screen.dart';
+import 'features/auth/screens/register_screen.dart';
 
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-}
-
-Future<void> main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  PaintingBinding.instance.imageCache.maximumSizeBytes = 50 * 1024 * 1024; // 50MB
-
-PlatformDispatcher.instance.onError = (error, stack) {
-    debugPrint('════════ PLATFORM ERROR ════════');
-    debugPrint('$error');
-    // Lọc chỉ dòng có vifosa hoặc features
-    final frames = stack.toString().split('\n');
-    for (final f in frames) {
-      if (f.contains('vifosa') || f.contains('features') || f.contains('lib/')) {
-        debugPrint('>>> $f');
-      }
-    }
-    debugPrint('════════════════════════════════');
-    return true;
-  };
-
-  FlutterError.onError = (FlutterErrorDetails details) {
-    FlutterError.presentError(details);
-    debugPrint('════════════ FLUTTER ERROR ════════════');
-    debugPrint('EXCEPTION: ${details.exception}');
-    debugPrint('LIBRARY: ${details.library}');
-    debugPrint('CONTEXT: ${details.context}');
-    debugPrint('STACK:');
-    // In từng frame một để không bị cắt
-    final frames = details.stack.toString().split('\n');
-    for (var i = 0; i < frames.length; i++) {
-      debugPrint('  #$i ${frames[i]}');
-    }
-    debugPrint('═══════════════════════════════════════');
-  };
-
-  await Hive.initFlutter();
-  await Hive.openBox('guest_cart');
-  await Hive.openBox('menu_prefs');
-  await Firebase.initializeApp();
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-  // Tạo container thủ công để warm-up đúng thứ tự:
-  // 1. authProvider tạo ra, bắt đầu _tryRestoreSession() (async)
-  // 2. appRouterProvider tạo ra, _RouterNotifier gắn ref.listen vào authProvider
-  // 3. Khi _tryRestoreSession() resolve → notifyListeners() → GoRouter redirect
-  final container = ProviderContainer(
-    overrides: [
-      tokenServiceProvider.overrideWithValue(TokenServiceImpl()),
-    ],
-  );
-  container.read(authProvider);    // khởi tạo auth (bắt đầu chạy async)
-  container.read(appRouterProvider); // khởi tạo router, gắn listener ngay
-
-  runApp(
-    UncontrolledProviderScope(
-      container: container,
-      child: const VifosaApp(),
-    ),
-  );
+  // Firebase.initializeApp() se them tuan 1 ngay 6 (spec TO-7)
+  runApp(const ProviderScope(child: VifosaApp()));
 }
 
 class VifosaApp extends ConsumerStatefulWidget {
   const VifosaApp({super.key});
-
   @override
   ConsumerState<VifosaApp> createState() => _VifosaAppState();
 }
 
 class _VifosaAppState extends ConsumerState<VifosaApp> {
+  GoRouter? _router;
+
   @override
-  void initState() {
-    super.initState();
-    _initFcm();
-  }
-
-  Future<void> _initFcm() async {
-    final messaging = FirebaseMessaging.instance;
-    await messaging.requestPermission(alert: true, badge: true, sound: true);
-
-    FirebaseMessaging.onMessage.listen((msg) {
-      ref.read(notificationProvider.notifier).handleIncomingMessage(msg);
-    });
-
-    FirebaseMessaging.onMessageOpenedApp.listen(_navigateFromMessage);
-
-    final initial = await messaging.getInitialMessage();
-    if (initial != null) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _navigateFromMessage(initial),
-      );
-    }
-
-    messaging.onTokenRefresh.listen(
-      (token) => ref.read(authProvider.notifier).updateFcmToken(token),
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _router ??= GoRouter(
+      initialLocation: '/login',
+      refreshListenable: _AuthListenable(ProviderScope.containerOf(context)),
+      redirect: (context, state) {
+        final authState = ref.read(authProvider);
+        final isAuth = authState.status == AuthStatus.authenticated;
+        final onAuthPage = state.matchedLocation == '/login' ||
+            state.matchedLocation == '/register';
+        if (!isAuth && !onAuthPage) return '/login';
+        if (isAuth && onAuthPage) return '/home';
+        return null;
+      },
+      routes: [
+        GoRoute(path: '/login',    builder: (_, __) => const LoginScreen()),
+        GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
+        GoRoute(path: '/home',     builder: (_, __) => const _HomePlaceholder()),
+      ],
     );
-  }
-
-  void _navigateFromMessage(RemoteMessage message) {
-    final router = ref.read(appRouterProvider);
-    final data = message.data;
-    switch (data['type']) {
-      case 'order_update':
-        router.push('/order/${data['orderId']}');
-      case 'social':
-        router.push('/social/post/${data['postId']}');
-      default:
-        router.push('/notifications');
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final router = ref.watch(appRouterProvider);
     return MaterialApp.router(
-      title: 'Vifosa',
+      title: 'Viet Food Shops Alliance',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
-      routerConfig: router,
-      builder: (context, child) => InAppNotificationOverlay(
-        child: child ?? const SizedBox.shrink(),
+      theme: ThemeData(colorSchemeSeed: Colors.orange, useMaterial3: true),
+      routerConfig: _router!,
+    );
+  }
+}
+
+// --- Home placeholder — tuan 6 se thay bang HomeScreen that ---
+class _HomePlaceholder extends ConsumerWidget {
+  const _HomePlaceholder();
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authProvider).user;
+    final nickname = user?['nickname'] ?? user?['username'] ?? 'ban';
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Vifosa'),
+        backgroundColor: Colors.orange,
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => ref.read(authProvider.notifier).logout(),
+            tooltip: 'Dang xuat',
+          ),
+        ],
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.restaurant, size: 80, color: Colors.orange),
+            const SizedBox(height: 16),
+            Text('Chao $nickname!',
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text('Home screen - Tuan 6',
+                style: TextStyle(color: Colors.grey)),
+          ],
+        ),
       ),
     );
+  }
+}
+
+// --- Ket noi Riverpod state voi GoRouter refresh ---
+class _AuthListenable extends ChangeNotifier {
+  _AuthListenable(ProviderContainer container) {
+    _sub = container.listen(authProvider, (_, __) => notifyListeners());
+  }
+
+  late final ProviderSubscription _sub;
+
+  @override
+  void dispose() {
+    _sub.close();
+    super.dispose();
   }
 }

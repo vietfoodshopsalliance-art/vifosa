@@ -1,134 +1,84 @@
-// mobile/lib/features/auth/providers/auth_provider.dart
-
-import 'dart:async';
-
 import 'package:dio/dio.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../data/auth_repository.dart';
+import '../../../core/storage/secure_storage.dart';
 
-import '../../../core/network/api_endpoints.dart';
-import '../../../core/models/user.dart';
-import '../../../core/network/dio_client.dart';
-import '../../../core/network/socket_client.dart';
+// ─── State ──────────────────────────────────────────────────────
 
-enum AuthStatus { loading, authenticated, unauthenticated }
+enum AuthStatus { initial, loading, authenticated, unauthenticated, error }
 
 class AuthState {
-  final AuthStatus status;
-  final AppUser? user;
-  final String activeRole;
-  final String? error;
-
   const AuthState({
-    required this.status,
+    this.status = AuthStatus.initial,
     this.user,
-    this.activeRole = 'customer',
     this.error,
   });
 
+  final AuthStatus status;
+  final Map<String, dynamic>? user;
+  final String? error;
+
+  bool get isAuthenticated => status == AuthStatus.authenticated;
+
   AuthState copyWith({
     AuthStatus? status,
-    AppUser? user,
-    String? activeRole,
+    Map<String, dynamic>? user,
     String? error,
   }) =>
       AuthState(
         status: status ?? this.status,
         user: user ?? this.user,
-        activeRole: activeRole ?? this.activeRole,
         error: error,
       );
-
-  bool get isAuthenticated => status == AuthStatus.authenticated;
-  bool get isLoading => status == AuthStatus.loading;
 }
 
-final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  final client = ref.watch(dioClientProvider);
-  final notifier = AuthNotifier(client);
-  client.forceLogout = notifier.logout;
-  return notifier;
-});
+// ─── Notifier ───────────────────────────────────────────────────
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  final DioClient _client;
-
-  AuthNotifier(this._client)
-      : super(const AuthState(status: AuthStatus.loading)) {
-    _tryRestoreSession();
+  AuthNotifier(this._repo) : super(const AuthState()) {
+    _init();
   }
 
-  Future<void> _tryRestoreSession() async {
-    try {
-      await _doRestore().timeout(const Duration(seconds: 4));
-    } on TimeoutException {
-      if (mounted) state = const AuthState(status: AuthStatus.unauthenticated);
-    } catch (e) {
-      if (mounted) state = const AuthState(status: AuthStatus.unauthenticated);
-    }
-  }
+  final AuthRepository _repo;
 
-  Future<void> _doRestore() async {
-    String? token;
-    try {
-      token = await _client.accessToken;
-    } catch (_) {
-      if (mounted) state = const AuthState(status: AuthStatus.unauthenticated);
-      return;
-    }
-
+  Future<void> _init() async {
+    state = state.copyWith(status: AuthStatus.loading);
+    final token = await SecureStorage.getAccessToken();
     if (token == null) {
-      if (mounted) state = const AuthState(status: AuthStatus.unauthenticated);
+      state = state.copyWith(status: AuthStatus.unauthenticated);
       return;
     }
-
     try {
-      final res = await _client.dio.get(ApiEndpoints.me);
-      // Backend trả { success, data: { user } } hoặc { user } — unwrap an toàn
-      final body = _unwrap(res.data as Map<String, dynamic>);
-      final user = AppUser.fromJson(body);
-      if (mounted) {
-        state = AuthState(
-          status: AuthStatus.authenticated,
-          user: user,
-          activeRole: user.roles.first,
-        );
-      }
-      unawaited(_registerFcmToken());
-      unawaited(SocketClient().connect(accessToken: token));
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 401) await _client.clearTokens();
-      if (mounted) state = const AuthState(status: AuthStatus.unauthenticated);
+      final user = await _repo.getMe();
+      state = state.copyWith(status: AuthStatus.authenticated, user: user);
     } catch (_) {
-      if (mounted) state = const AuthState(status: AuthStatus.unauthenticated);
+      state = state.copyWith(status: AuthStatus.unauthenticated);
     }
   }
 
-  Future<void> login({required String identifier, required String password}) async {
+  Future<void> login({
+    required String credential,
+    required String password,
+  }) async {
     state = state.copyWith(status: AuthStatus.loading, error: null);
     try {
-      final res = await _client.dio.post(ApiEndpoints.login, data: {
-        'identifier': identifier,
-        'password': password,
-      });
-      // Unwrap { success: true, data: { accessToken, refreshToken, user } }
-      final body = _unwrap(res.data as Map<String, dynamic>);
-      await _client.saveTokens(
-        accessToken:  body['accessToken']  as String,
-        refreshToken: body['refreshToken'] as String,
+      final data = await _repo.login(
+        credential: credential,
+        password: password,
       );
-      final user = AppUser.fromJson(body['user'] as Map<String, dynamic>);
-      state = AuthState(
-        status: AuthStatus.authenticated,
-        user: user,
-        activeRole: user.roles.first,
-      );
-      unawaited(_registerFcmToken());
-      unawaited(SocketClient().connect(accessToken: body['accessToken'] as String));
-    } catch (e) {
       state = state.copyWith(
-        status: AuthStatus.unauthenticated,
-        error: _extractError(e),
+        status: AuthStatus.authenticated,
+        user: data['user'],
+      );
+    } on DioException catch (e) { // ← fix lỗi 1: Dio 5.x dùng DioException
+      state = state.copyWith(
+        status: AuthStatus.error,
+        error: _parseDioError(e),
+      );
+    } on Exception catch (_) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        error: 'Đã có lỗi xảy ra',
       );
     }
   }
@@ -142,88 +92,60 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(status: AuthStatus.loading, error: null);
     try {
-        await _client.dio.post(ApiEndpoints.register, data: {
-          'username': username,
-          'nickname': nickname,
-          'email': email,
-          'phone': phone,
-          'password': password,
-          'tosAccepted': true,
-        });
-      await login(identifier: username, password: password);
-    } catch (e) {
+      final data = await _repo.register(
+        username: username,
+        nickname: nickname,
+        email: email,
+        phone: phone,
+        password: password,
+      );
       state = state.copyWith(
-        status: AuthStatus.unauthenticated,
-        error: _extractError(e),
+        status: AuthStatus.authenticated,
+        user: data['user'],
+      );
+    } on DioException catch (e) { // ← fix lỗi 1
+      state = state.copyWith(
+        status: AuthStatus.error,
+        error: _parseDioError(e),
+      );
+    } on Exception catch (_) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        error: 'Đã có lỗi xảy ra',
       );
     }
   }
 
   Future<void> logout() async {
-    try { await _client.dio.post(ApiEndpoints.logout, data: {}); } catch (_) {}
-    SocketClient().disconnect();
-    await _client.clearTokens();
+    await _repo.logout();
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
-  void switchRole(String role) {
-    if (state.user?.roles.contains(role) ?? false) {
-      state = state.copyWith(activeRole: role);
-    }
-  }
-
-/// Gọi lại /me để cập nhật user + roles sau khi backend thay đổi
-  /// (ví dụ: vừa tạo quán → backend đã cấp role store_owner)
-  Future<void> refreshAuth() async {
-    if (!state.isAuthenticated) return;
+  Future<void> saveFcmToken(String token) async {
     try {
-      final res = await _client.dio.get(ApiEndpoints.me);
-      final body = _unwrap(res.data as Map<String, dynamic>);
-      final user = AppUser.fromJson(body);
-      if (mounted) {
-        state = state.copyWith(
-          user: user,
-          activeRole: user.roles.contains('store_owner') ? 'store_owner' : state.activeRole,
-        );
-      }
-    } catch (_) {
-      // Không throw — đây là best-effort refresh
-    }
-  }
-
-  Future<void> updateFcmToken(String token) async {
-    if (!state.isAuthenticated) return;
-    try {
-      await _client.dio.post(ApiEndpoints.fcmToken, data: {'fcmToken': token});
+      await _repo.saveFcmToken(token);
     } catch (_) {}
   }
 
-  Future<void> _registerFcmToken() async {
+  // Parse lỗi từ backend Fastify: { message: "..." }
+  String _parseDioError(DioException e) {
     try {
-      final token = await FirebaseMessaging.instance.getToken();
-      if (token != null) await updateFcmToken(token);
+      final data = e.response?.data;
+      if (data is Map) return data['message'] ?? 'Lỗi kết nối';
     } catch (_) {}
-  }
-
-  /// Backend có thể trả { success, data: {...} } hoặc trực tiếp {...}
-  /// Hàm này unwrap lớp data nếu có.
-  Map<String, dynamic> _unwrap(Map<String, dynamic> raw) {
-    if (raw.containsKey('data') && raw['data'] is Map<String, dynamic>) {
-      return raw['data'] as Map<String, dynamic>;
-    }
-    return raw;
-  }
-
-  String _extractError(Object e) {
-    try {
-      final data = (e as dynamic).response?.data;
-      if (data is Map) {
-        // Thử unwrap lớp data trước
-        final inner = data['data'] ?? data;
-        return (inner['message'] ?? data['message'] ?? e.toString()) as String;
-      }
-    } catch (_) {}
-    return e.toString();
+    return switch (e.type) {
+      DioExceptionType.connectionTimeout => 'Hết thời gian kết nối',
+      DioExceptionType.receiveTimeout    => 'Server phản hồi quá chậm',
+      DioExceptionType.connectionError   => 'Không thể kết nối đến server',
+      _                                  => 'Lỗi kết nối',
+    };
   }
 }
 
+// ─── Providers ──────────────────────────────────────────────────
+
+final authRepositoryProvider = Provider((_) => AuthRepository());
+
+final authProvider = StateNotifierProvider<AuthNotifier, AuthState>(
+  (ref) => AuthNotifier(ref.read(authRepositoryProvider)),
+);

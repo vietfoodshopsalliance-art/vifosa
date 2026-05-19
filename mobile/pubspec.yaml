@@ -1,8 +1,10 @@
-# pubspec.yaml
 name: vifosa
 description: Viet Food Shops Alliance — đặt đồ ăn TPHCM
 publish_to: 'none'
 version: 1.0.0+1
+
+# Spec BR-5: Flutter package name = vifosa
+# Spec TO-1: Flutter 3.x + Dart
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -11,21 +13,17 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # Location
-  geolocator: ^12.0.0
-
-  # State management
+  # State management — Spec mục 4.1
   flutter_riverpod: ^2.5.1
 
-  # HTTP client
+  # HTTP client + interceptor
   dio: ^5.4.3
-  http: ^1.2.0
 
   # Navigation
   go_router: ^13.2.0
 
   # Secure token storage (JWT)
-  flutter_secure_storage: ^9.2.2
+  flutter_secure_storage: ^9.0.0
 
   # Image loading & cache
   cached_network_image: ^3.3.1
@@ -33,31 +31,28 @@ dependencies:
   # Image picker (upload ảnh món, avatar, post)
   image_picker: ^1.1.2
 
-  # Image compress trước upload
+  # Image compress trước upload — Spec TO-5: client compress 10MB → ~2MB
   flutter_image_compress: ^2.2.0
 
-  # Firebase FCM
+  # Firebase — Spec TO-7: FCM setup tuần 1
   firebase_core: ^2.27.0
   firebase_messaging: ^14.7.19
 
-  # Local storage
-  shared_preferences: ^2.2.0
+  # Local storage cho guest cart — Spec 5.1.5: guest dùng Hive
   hive_flutter: ^1.1.0
 
-  # Map OSM
+  # Map — Spec TO-6: OSM + flutter_map
   flutter_map: ^6.1.0
   latlong2: ^0.9.0
 
-  # Real-time
-  socket_io_client: ^2.0.3+1
-
   # Utility
-  intl: ^0.19.0
-  url_launcher: ^6.2.5
-  share_plus: ^9.0.0
-  qr_flutter: ^4.1.0
-  permission_handler: ^11.3.1
-  image: ^4.8.0
+  intl: ^0.19.0              # format giá tiền VNĐ, ngày giờ
+  url_launcher: ^6.2.5       # mở link Google Maps, Zalo deep link
+  share_plus: ^9.0.0         # chia sẻ link tracking khách vãng lai
+  qr_flutter: ^4.1.0         # QR code tracking — Spec 5.2
+  permission_handler: ^11.3.1 # GPS permission
+  geolocator: ^11.0.0        # lấy vị trí GPS — Spec 5.1.6
+
   cupertino_icons: ^1.0.6
 
 dev_dependencies:
@@ -69,4 +64,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-# pubspec.yaml
+
+  # Thêm assets khi có (ảnh placeholder, icons)
+  # assets:
+  #   - assets/images/
+  #   - assets/icons/
