@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { api, ApiError } from '@/lib/api'
+import { api } from '@/lib/api'
 
 interface User {
   _id: string
@@ -19,15 +19,39 @@ interface PageData {
   nextCursor?: string
 }
 
+type SortCol = 'username' | 'roles' | 'status'
+type SortDir = 'asc' | 'desc'
+
+const ROLE_RANK: Record<string, number> = { admin: 0, mod: 1, store_owner: 2, customer: 3 }
+function topRole(roles: string[]) {
+  return roles.reduce((best, r) => (ROLE_RANK[r] ?? 99) < (ROLE_RANK[best] ?? 99) ? r : best, roles[0] ?? '')
+}
+
 export default function AdminUsersPage() {
   const [search, setSearch]   = useState('')
   const [filter, setFilter]   = useState<'all' | 'active' | 'suspended' | 'mod'>('all')
   const [data, setData]       = useState<PageData>({ users: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState('')
-  const [modal, setModal]     = useState<{ type: 'reset'; user: User } | null>(null)
+  const [modal, setModal]     = useState<{ type: 'reset'; user: User } | { type: 'delete'; user: User } | null>(null)
   const [tempPw, setTempPw]   = useState('')
   const [actionMsg, setActionMsg] = useState('')
+  const [sortCol, setSortCol] = useState<SortCol | null>(null)
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
+
+  function toggleSort(col: SortCol) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
+
+  const sortedUsers = [...data.users].sort((a, b) => {
+    if (!sortCol) return 0
+    let cmp = 0
+    if (sortCol === 'username')   cmp = (a.username ?? '').localeCompare(b.username ?? '')
+    else if (sortCol === 'roles') cmp = (ROLE_RANK[topRole(a.roles)] ?? 99) - (ROLE_RANK[topRole(b.roles)] ?? 99)
+    else if (sortCol === 'status') cmp = (a.isActive ? 1 : 0) - (b.isActive ? 1 : 0)
+    return sortDir === 'asc' ? cmp : -cmp
+  })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -74,6 +98,19 @@ export default function AdminUsersPage() {
     } catch { setActionMsg('Có lỗi xảy ra.') }
   }
 
+  async function confirmDelete() {
+    if (modal?.type !== 'delete') return
+    try {
+      await api.delete(`/admin/users/${modal.user._id}`)
+      setActionMsg(`Đã xóa người dùng "${modal.user.username}".`)
+      setModal(null)
+      load()
+    } catch (e: any) {
+      setModal(null)
+      setActionMsg(e?.message ?? 'Có lỗi xảy ra khi xóa.')
+    }
+  }
+
   return (
     <div className="p-6">
       <h1 className="mb-6 text-xl font-bold text-[#1A1200]">Quản lý người dùng</h1>
@@ -116,9 +153,9 @@ export default function AdminUsersPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-semibold text-[#6B5C3E] uppercase">
-              <th className="px-4 py-3">Người dùng</th>
-              <th className="px-4 py-3">Vai trò</th>
-              <th className="px-4 py-3">Trạng thái</th>
+              <Th col="username" label="Người dùng" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} />
+              <Th col="roles"    label="Vai trò"    sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} />
+              <Th col="status"   label="Trạng thái" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} />
               <th className="px-4 py-3">Thao tác</th>
             </tr>
           </thead>
@@ -126,10 +163,10 @@ export default function AdminUsersPage() {
             {loading && (
               <tr><td colSpan={4} className="px-4 py-8 text-center text-[#6B5C3E]">Đang tải...</td></tr>
             )}
-            {!loading && data.users.length === 0 && (
+            {!loading && sortedUsers.length === 0 && (
               <tr><td colSpan={4} className="px-4 py-8 text-center text-[#6B5C3E]">Không tìm thấy user nào.</td></tr>
             )}
-            {data.users.map((u) => (
+            {sortedUsers.map((u) => (
               <tr key={u._id} className="border-b border-gray-50 hover:bg-gray-50">
                 <td className="px-4 py-3">
                   <div className="font-medium text-[#1A1200]">{u.username}</div>
@@ -139,8 +176,9 @@ export default function AdminUsersPage() {
                   <div className="flex flex-wrap gap-1">
                     {u.roles.map((r) => (
                       <span key={r} className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                        r === 'admin' ? 'bg-red-100 text-red-700' :
-                        r === 'mod'   ? 'bg-purple-100 text-purple-700' :
+                        r === 'admin'       ? 'bg-red-100 text-red-700' :
+                        r === 'mod'         ? 'bg-purple-100 text-purple-700' :
+                        r === 'store_owner' ? 'bg-blue-100 text-blue-700' :
                         'bg-gray-100 text-gray-600'
                       }`}>{r}</span>
                     ))}
@@ -175,6 +213,14 @@ export default function AdminUsersPage() {
                     >
                       Reset mật khẩu
                     </button>
+                    {!u.roles.includes('admin') && (
+                      <button
+                        onClick={() => setModal({ type: 'delete', user: u })}
+                        className="rounded-lg border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                      >
+                        Xóa
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -207,6 +253,48 @@ export default function AdminUsersPage() {
           </div>
         </div>
       )}
+
+      {/* Delete confirm modal */}
+      {modal?.type === 'delete' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="mb-2 text-base font-bold text-[#1A1200]">Xóa người dùng</h2>
+            <p className="mb-4 text-sm text-[#6B5C3E]">
+              Bạn có chắc muốn xóa tài khoản <span className="font-semibold text-[#1A1200]">"{modal.user.username}"</span>? Hành động này không thể hoàn tác.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setModal(null)}
+                className="flex-1 rounded-lg border border-gray-200 py-2 text-sm"
+              >
+                Huỷ
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 rounded-lg bg-red-600 py-2 text-sm font-semibold text-white hover:bg-red-700"
+              >
+                Xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+function Th({ col, label, sortCol, sortDir, onSort }: {
+  col: SortCol; label: string
+  sortCol: SortCol | null; sortDir: SortDir
+  onSort: (col: SortCol) => void
+}) {
+  const active = sortCol === col
+  return (
+    <th className="px-4 py-3 cursor-pointer select-none hover:text-[#1A1200]" onClick={() => onSort(col)}>
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <span className="text-[10px] leading-none">{active ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}</span>
+      </span>
+    </th>
   )
 }

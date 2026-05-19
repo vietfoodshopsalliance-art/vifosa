@@ -3,3 +3,6 @@ backend/secrets/
 # Firebase secret — KHÔNG commit lên GitHub
 secrets/
 node_modules
+
+backend/.env
+.vercel

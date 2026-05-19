@@ -12,11 +12,11 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: Method, path: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     method,
     credentials: 'include',
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...extraHeaders },
     body: body ? JSON.stringify(body) : undefined,
   })
 
@@ -34,9 +34,9 @@ async function request<T>(method: Method, path: string, body?: unknown): Promise
 }
 
 export const api = {
-  get:    <T>(path: string) => request<T>('GET', path),
-  post:   <T>(path: string, body: unknown) => request<T>('POST', path, body),
-  put:    <T>(path: string, body: unknown) => request<T>('PUT', path, body),
-  patch:  <T>(path: string, body: unknown) => request<T>('PATCH', path, body),
-  delete: <T>(path: string) => request<T>('DELETE', path),
+  get:    <T>(path: string, h?: Record<string, string>) => request<T>('GET', path, undefined, h),
+  post:   <T>(path: string, body: unknown, h?: Record<string, string>) => request<T>('POST', path, body, h),
+  put:    <T>(path: string, body: unknown, h?: Record<string, string>) => request<T>('PUT', path, body, h),
+  patch:  <T>(path: string, body: unknown, h?: Record<string, string>) => request<T>('PATCH', path, body, h),
+  delete: <T>(path: string, h?: Record<string, string>) => request<T>('DELETE', path, undefined, h),
 }

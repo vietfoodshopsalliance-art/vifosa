@@ -23,6 +23,14 @@ interface PageData {
 }
 
 type Filter = 'all' | 'active' | 'suspended' | 'locked' | 'vip'
+type SortCol = 'name' | 'ownerUsername' | 'ordersThisMonth' | 'rating' | 'status'
+type SortDir = 'asc' | 'desc'
+
+function statusRank(s: Store) {
+  if (s.isSuspended) return 0
+  if (s.isAdLockedByAdmin) return 1
+  return 2
+}
 
 export default function AdminStoresPage() {
   const [filter, setFilter]       = useState<Filter>('all')
@@ -33,8 +41,26 @@ export default function AdminStoresPage() {
   const [actionMsg, setActionMsg] = useState('')
   const [transferModal, setTransferModal] = useState<Store | null>(null)
   const [newOwner, setNewOwner]   = useState('')
-  const [deleteTarget, setDeleteTarget] = useState<Store | null>(null)
-  const [deleteError, setDeleteError]   = useState('')
+  const [deleteModal, setDeleteModal] = useState<Store | null>(null)
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
+  const [sortCol, setSortCol]     = useState<SortCol | null>(null)
+  const [sortDir, setSortDir]     = useState<SortDir>('asc')
+
+  function toggleSort(col: SortCol) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
+
+  const sortedStores = [...data.stores].sort((a, b) => {
+    if (!sortCol) return 0
+    let cmp = 0
+    if (sortCol === 'name')           cmp = a.name.localeCompare(b.name)
+    else if (sortCol === 'ownerUsername') cmp = (a.ownerUsername ?? '').localeCompare(b.ownerUsername ?? '')
+    else if (sortCol === 'ordersThisMonth') cmp = a.ordersThisMonth - b.ordersThisMonth
+    else if (sortCol === 'rating')    cmp = a.rating - b.rating
+    else if (sortCol === 'status')    cmp = statusRank(a) - statusRank(b)
+    return sortDir === 'asc' ? cmp : -cmp
+  })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -72,17 +98,6 @@ export default function AdminStoresPage() {
     } catch { setActionMsg('Có lỗi xảy ra.') }
   }
 
-  async function deleteStore() {
-    if (!deleteTarget) return
-    setDeleteError('')
-    try {
-      await api.post(`/admin/stores/bulk`, { ids: [deleteTarget._id], action: 'delete' })
-      setActionMsg(`Đã xoá quán "${deleteTarget.name}".`)
-      setDeleteTarget(null)
-      load()
-    } catch (e: any) { setDeleteError(e?.message ?? 'Có lỗi xảy ra.') }
-  }
-
   async function transfer() {
     if (!transferModal || !newOwner.trim()) return
     try {
@@ -90,6 +105,31 @@ export default function AdminStoresPage() {
       setActionMsg(`Đã chuyển nhượng quán ${transferModal.name} cho ${newOwner}.`)
       setTransferModal(null)
       setNewOwner('')
+      load()
+    } catch { setActionMsg('Có lỗi xảy ra.') }
+  }
+
+  async function confirmDelete() {
+    if (!deleteModal) return
+    try {
+      await api.delete(`/admin/stores/${deleteModal._id}`)
+      setActionMsg(`Đã xóa quán "${deleteModal.name}".`)
+      setDeleteModal(null)
+      load()
+    } catch {
+      setDeleteModal(null)
+      setActionMsg('Có lỗi xảy ra khi xóa.')
+    }
+  }
+
+  async function confirmBulkDelete() {
+    const ids = [...selected]
+    if (!ids.length) return
+    try {
+      await api.post(`/admin/stores/bulk`, { ids, action: 'delete' })
+      setActionMsg(`Đã xóa ${ids.length} quán.`)
+      setSelected(new Set())
+      setBulkDeleteConfirm(false)
       load()
     } catch { setActionMsg('Có lỗi xảy ra.') }
   }
@@ -129,12 +169,7 @@ export default function AdminStoresPage() {
             <button onClick={() => bulkAction('lock_ad')} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100">Tắt đăng tin</button>
             <button onClick={() => bulkAction('unlock_ad')} className="rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-800 hover:bg-green-100">Mở đăng tin</button>
             <button onClick={() => bulkAction('suspend')} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100">Khoá bán hàng</button>
-            <button
-              onClick={() => { if (confirm(`Xoá ${selected.size} quán đã chọn? Không thể hoàn tác.`)) bulkAction('delete') }}
-              className="rounded-lg border border-red-300 bg-red-100 px-3 py-1.5 text-xs font-bold text-red-900 hover:bg-red-200"
-            >
-              Xoá quán
-            </button>
+            <button onClick={() => setBulkDeleteConfirm(true)} className="rounded-lg border border-red-300 bg-red-100 px-3 py-1.5 text-xs font-medium text-red-900 hover:bg-red-200">Xóa quán</button>
           </div>
         )}
       </div>
@@ -148,18 +183,18 @@ export default function AdminStoresPage() {
                 if (e.target.checked) setSelected(new Set(data.stores.map(s => s._id)))
                 else setSelected(new Set())
               }} /></th>
-              <th className="px-4 py-3">Quán</th>
-              <th className="px-4 py-3">Owner</th>
-              <th className="px-4 py-3">Đơn/tháng</th>
-              <th className="px-4 py-3">Rating</th>
-              <th className="px-4 py-3">Trạng thái</th>
+              <Th col="name" label="Quán" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} />
+              <Th col="ownerUsername" label="Owner" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} />
+              <Th col="ordersThisMonth" label="Đơn/tháng" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} />
+              <Th col="rating" label="Rating" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} />
+              <Th col="status" label="Trạng thái" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} />
               <th className="px-4 py-3">Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {loading && <tr><td colSpan={7} className="px-4 py-8 text-center text-[#6B5C3E]">Đang tải...</td></tr>}
-            {!loading && data.stores.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-[#6B5C3E]">Không tìm thấy quán nào.</td></tr>}
-            {data.stores.map((s) => (
+            {!loading && sortedStores.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-[#6B5C3E]">Không tìm thấy quán nào.</td></tr>}
+            {sortedStores.map((s) => (
               <tr key={s._id} className="border-b border-gray-50 hover:bg-gray-50">
                 <td className="px-3 py-3">
                   <input type="checkbox" checked={selected.has(s._id)} onChange={() => toggleSelect(s._id)} />
@@ -190,10 +225,10 @@ export default function AdminStoresPage() {
                       Chuyển nhượng
                     </button>
                     <button
-                      onClick={() => setDeleteTarget(s)}
+                      onClick={() => setDeleteModal(s)}
                       className="rounded-lg border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
                     >
-                      Xoá
+                      Xóa
                     </button>
                   </div>
                 </td>
@@ -202,35 +237,6 @@ export default function AdminStoresPage() {
           </tbody>
         </table>
       </div>
-
-      {/* Delete confirm modal */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-            <h2 className="mb-2 text-base font-bold text-[#1A1200]">Xoá quán: {deleteTarget.name}</h2>
-            <p className="mb-4 text-sm text-[#6B5C3E]">
-              Quán sẽ bị ẩn hoàn toàn khỏi hệ thống. Hành động này không thể hoàn tác.
-            </p>
-            {deleteError && (
-              <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{deleteError}</p>
-            )}
-            <div className="flex gap-3">
-              <button
-                onClick={() => { setDeleteTarget(null); setDeleteError('') }}
-                className="flex-1 rounded-lg border border-gray-200 py-2 text-sm"
-              >
-                Huỷ
-              </button>
-              <button
-                onClick={deleteStore}
-                className="flex-1 rounded-lg bg-red-600 py-2 text-sm font-semibold text-white hover:bg-red-700"
-              >
-                Xác nhận xoá
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Transfer modal */}
       {transferModal && (
@@ -263,7 +269,80 @@ export default function AdminStoresPage() {
           </div>
         </div>
       )}
+
+      {/* Delete single modal */}
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="mb-2 text-base font-bold text-[#1A1200]">Xóa quán</h2>
+            <p className="mb-4 text-sm text-[#6B5C3E]">
+              Bạn có chắc muốn xóa quán <span className="font-semibold text-[#1A1200]">"{deleteModal.name}"</span>? Hành động này không thể hoàn tác.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteModal(null)}
+                className="flex-1 rounded-lg border border-gray-200 py-2 text-sm"
+              >
+                Huỷ
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 rounded-lg bg-red-600 py-2 text-sm font-semibold text-white hover:bg-red-700"
+              >
+                Xóa quán
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk delete confirm modal */}
+      {bulkDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="mb-2 text-base font-bold text-[#1A1200]">Xóa {selected.size} quán</h2>
+            <p className="mb-4 text-sm text-[#6B5C3E]">
+              Bạn có chắc muốn xóa <span className="font-semibold text-[#1A1200]">{selected.size} quán</span> đã chọn? Hành động này không thể hoàn tác.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setBulkDeleteConfirm(false)}
+                className="flex-1 rounded-lg border border-gray-200 py-2 text-sm"
+              >
+                Huỷ
+              </button>
+              <button
+                onClick={confirmBulkDelete}
+                className="flex-1 rounded-lg bg-red-600 py-2 text-sm font-semibold text-white hover:bg-red-700"
+              >
+                Xóa tất cả
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+function Th({ col, label, sortCol, sortDir, onSort }: {
+  col: SortCol; label: string
+  sortCol: SortCol | null; sortDir: SortDir
+  onSort: (col: SortCol) => void
+}) {
+  const active = sortCol === col
+  return (
+    <th
+      className="px-4 py-3 cursor-pointer select-none hover:text-[#1A1200]"
+      onClick={() => onSort(col)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <span className="text-[10px] leading-none">
+          {active ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+        </span>
+      </span>
+    </th>
   )
 }
 

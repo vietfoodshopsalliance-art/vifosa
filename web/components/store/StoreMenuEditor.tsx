@@ -17,7 +17,7 @@ interface MenuItem {
   price: number
   status: 'active' | 'closed' | 'paused'
   stock?: number
-  mainImage?: string
+  images?: string[]
   isDeleted?: boolean
 }
 
@@ -44,18 +44,22 @@ export default function StoreMenuEditor({ storeId, isAdminMode = false }: StoreM
   const [itemModal, setItemModal]   = useState<Partial<MenuItem> | null>(null)
   const [actionMsg, setActionMsg]   = useState('')
 
-  const headers = isAdminMode ? { 'X-Admin-Override': 'true' } : {}
+  const adminHeaders = isAdminMode ? { 'X-Admin-Override': 'true' } : undefined
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [catRes, itemRes] = await Promise.all([
-        api.get<{ categories: Category[] }>(`/stores/${storeId}/categories`),
-        api.get<{ items: MenuItem[] }>(`/stores/${storeId}/menu-items`),
-      ])
-      setCategories(catRes.categories.sort((a, b) => a.displayOrder - b.displayOrder))
-      setItems(itemRes.items.filter((i) => !i.isDeleted))
-      if (!activeCat && catRes.categories.length > 0) setActiveCat(catRes.categories[0]._id)
+      const res = await api.get<{ categories: Array<Category & { items: MenuItem[] }> }>(`/stores/${storeId}/menu`)
+      const cats: Category[] = []
+      const allItems: MenuItem[] = []
+      for (const cat of res.categories) {
+        const { items, ...catData } = cat as any
+        cats.push(catData)
+        allItems.push(...(items ?? []))
+      }
+      setCategories(cats)
+      setItems(allItems)
+      if (!activeCat && cats.length > 0) setActiveCat(cats[0]._id)
     } catch {}
     finally { setLoading(false) }
   }, [storeId, activeCat])
@@ -66,9 +70,9 @@ export default function StoreMenuEditor({ storeId, isAdminMode = false }: StoreM
     if (!catModal?.name?.trim()) return
     try {
       if (catModal._id) {
-        await api.patch(`/stores/${storeId}/categories/${catModal._id}`, { name: catModal.name })
+        await api.patch(`/stores/${storeId}/categories/${catModal._id}`, { name: catModal.name }, adminHeaders)
       } else {
-        await api.post(`/stores/${storeId}/categories`, { name: catModal.name, displayOrder: categories.length })
+        await api.post(`/stores/${storeId}/categories`, { name: catModal.name, displayOrder: categories.length }, adminHeaders)
       }
       setCatModal(null)
       load()
@@ -78,7 +82,7 @@ export default function StoreMenuEditor({ storeId, isAdminMode = false }: StoreM
   async function deleteCategory(id: string) {
     if (!confirm('Xoá danh mục này?')) return
     try {
-      await api.delete(`/stores/${storeId}/categories/${id}`)
+      await api.delete(`/stores/${storeId}/categories/${id}`, adminHeaders)
       load()
     } catch { setActionMsg('Xoá thất bại.') }
   }
@@ -88,9 +92,9 @@ export default function StoreMenuEditor({ storeId, isAdminMode = false }: StoreM
     try {
       const body = { ...itemModal, categoryId: activeCat }
       if (itemModal._id) {
-        await api.patch(`/stores/${storeId}/menu-items/${itemModal._id}`, body)
+        await api.patch(`/stores/${storeId}/items/${itemModal._id}`, body, adminHeaders)
       } else {
-        await api.post(`/stores/${storeId}/menu-items`, body)
+        await api.post(`/stores/${storeId}/items`, body, adminHeaders)
       }
       setItemModal(null)
       load()
@@ -100,7 +104,7 @@ export default function StoreMenuEditor({ storeId, isAdminMode = false }: StoreM
   async function softDeleteItem(id: string) {
     if (!confirm('Xoá món này?')) return
     try {
-      await api.patch(`/stores/${storeId}/menu-items/${id}`, { isDeleted: true })
+      await api.delete(`/stores/${storeId}/items/${id}`, adminHeaders)
       load()
     } catch { setActionMsg('Xoá thất bại.') }
   }
@@ -162,8 +166,8 @@ export default function StoreMenuEditor({ storeId, isAdminMode = false }: StoreM
             {catItems.length === 0 && <p className="text-sm text-[#6B5C3E]">Chưa có món trong danh mục này.</p>}
             {catItems.map((item) => (
               <div key={item._id} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-                {item.mainImage && (
-                  <img src={item.mainImage} alt={item.name} className="h-12 w-12 rounded-lg object-cover" />
+                {item.images?.[0] && (
+                  <img src={item.images[0]} alt={item.name} className="h-12 w-12 rounded-lg object-cover" />
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-[#1A1200]">{item.name}</p>
