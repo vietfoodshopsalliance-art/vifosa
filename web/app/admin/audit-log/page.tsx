@@ -34,7 +34,7 @@ export default function AdminAuditLogPage() {
       if (dateFrom)   params.set('from', dateFrom)
       if (dateTo)     params.set('to', dateTo)
       const res = await api.get<{ entries: AuditEntry[] }>(`/admin/audit-log?${params}`)
-      setEntries(res.entries)
+      setEntries(res.entries ?? [])
     } catch { setEntries([]) }
     finally { setLoading(false) }
   }, [actorId, targetType, dateFrom, dateTo])
