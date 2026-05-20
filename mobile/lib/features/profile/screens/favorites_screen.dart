@@ -14,8 +14,7 @@ import '../../../core/widgets/store_card.dart';
 // Providers
 // ---------------------------------------------------------------------------
 final _favItemsProvider = FutureProvider<List<MenuItem>>((ref) async {
-  final res = await DioClient()
-      .dio
+  final res = await DioClient.instance
       .get(ApiEndpoints.favorites, queryParameters: {'type': 'item'});
   return (res.data['items'] as List)
       .map((e) => MenuItem.fromJson(e as Map<String, dynamic>))
@@ -23,8 +22,7 @@ final _favItemsProvider = FutureProvider<List<MenuItem>>((ref) async {
 });
 
 final _favStoresProvider = FutureProvider<List<Store>>((ref) async {
-  final res = await DioClient()
-      .dio
+  final res = await DioClient.instance
       .get(ApiEndpoints.favorites, queryParameters: {'type': 'store'});
   return (res.data['stores'] as List)
       .map((e) => Store.fromJson(e as Map<String, dynamic>))
@@ -110,7 +108,7 @@ class _FavItemsTab extends ConsumerWidget {
 
   Future<void> _unlike(WidgetRef ref, String? likeId) async {
     if (likeId == null) return;
-    await DioClient().dio.delete(ApiEndpoints.likeDelete(likeId));
+    await DioClient.instance.delete(ApiEndpoints.likeDelete(likeId));
   }
 }
 
@@ -218,8 +216,7 @@ class _FavStoresTab extends ConsumerWidget {
           itemBuilder: (context, i) => _DismissibleStoreCard(
             store: stores[i],
             onUnlike: () async {
-              await DioClient()
-                  .dio
+              await DioClient.instance
                   .delete(ApiEndpoints.likeDelete(stores[i].likeId ?? ''));
               ref.invalidate(_favStoresProvider);
             },

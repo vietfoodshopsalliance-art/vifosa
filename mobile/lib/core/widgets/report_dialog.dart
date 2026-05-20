@@ -46,7 +46,7 @@ class _ReportSheetState extends State<_ReportSheet> {
     if (_selectedReason == null) return;
     setState(() => _isSubmitting = true);
     try {
-      await DioClient().dio.post(
+      await DioClient.instance.post(
         ApiEndpoints.reports,
         data: {
           'targetType': widget.targetType,

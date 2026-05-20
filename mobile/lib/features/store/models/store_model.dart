@@ -129,7 +129,7 @@ class StoreModel {
     if (today == null || today.isClosed) return StoreStatus.preorder;
 
     final current = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-    if (current >= today.open && current <= today.close) return StoreStatus.open;
+    if (current.compareTo(today.open) >= 0 && current.compareTo(today.close) <= 0) return StoreStatus.open;
     return StoreStatus.preorder;
   }
 }

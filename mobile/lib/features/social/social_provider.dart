@@ -53,7 +53,7 @@ class FeedNotifier extends StateNotifier<FeedState> {
   Future<void> fetchFeed() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final res = await DioClient().dio.get(
+      final res = await DioClient.instance.get(
         ApiEndpoints.posts,
         queryParameters: {'page': 1, 'limit': 10},
       );
@@ -76,7 +76,7 @@ class FeedNotifier extends StateNotifier<FeedState> {
     state = state.copyWith(isLoadingMore: true);
     try {
       final nextPage = state.page + 1;
-      final res = await DioClient().dio.get(
+      final res = await DioClient.instance.get(
         ApiEndpoints.posts,
         queryParameters: {'page': nextPage, 'limit': 10},
       );
@@ -107,7 +107,7 @@ class FeedNotifier extends StateNotifier<FeedState> {
     newList[idx] = updated;
     state = state.copyWith(posts: newList);
     try {
-      await DioClient().dio.post(ApiEndpoints.postLike(postId));
+      await DioClient.instance.post(ApiEndpoints.postLike(postId));
     } catch (_) {
       // Rollback
       newList[idx] = post;
@@ -116,7 +116,7 @@ class FeedNotifier extends StateNotifier<FeedState> {
   }
 
   Future<void> updatePost(String postId, Map<String, dynamic> body) async {
-    await DioClient().dio.put(ApiEndpoints.postDetail(postId), data: body);
+    await DioClient.instance.put(ApiEndpoints.postDetail(postId), data: body);
     final idx = state.posts.indexWhere((p) => p.id == postId);
     if (idx == -1) return;
     final post = state.posts[idx];
@@ -130,7 +130,7 @@ class FeedNotifier extends StateNotifier<FeedState> {
   }
 
   Future<void> deletePost(String postId) async {
-    await DioClient().dio.delete(ApiEndpoints.postDetail(postId));
+    await DioClient.instance.delete(ApiEndpoints.postDetail(postId));
     state = state.copyWith(
       posts: state.posts.where((p) => p.id != postId).toList(),
     );
@@ -151,7 +151,7 @@ final feedProvider =
 final postDetailProvider =
     FutureProvider.family<Post, String>((ref, postId) async {
   final res =
-      await DioClient().dio.get(ApiEndpoints.postDetail(postId));
+      await DioClient.instance.get(ApiEndpoints.postDetail(postId));
   return Post.fromJson(res.data as Map<String, dynamic>);
 });
 
@@ -192,8 +192,7 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
   Future<void> fetchComments() async {
     state = state.copyWith(isLoading: true);
     try {
-      final res = await DioClient()
-          .dio
+      final res = await DioClient.instance
           .get(ApiEndpoints.postComments(postId));
       // Build tree: top-level comments + replies
       final all = (res.data as List)
@@ -207,7 +206,7 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
   }
 
   Future<void> addComment(String content, {String? parentId}) async {
-    final res = await DioClient().dio.post(
+    final res = await DioClient.instance.post(
       ApiEndpoints.postComments(postId),
       data: {'content': content, if (parentId != null) 'parentId': parentId},
     );
@@ -279,8 +278,7 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
 
     state = state.copyWith(comments: applyOptimistic(state.comments));
     try {
-      await DioClient()
-          .dio
+      await DioClient.instance
           .post(ApiEndpoints.commentLike(postId, commentId));
     } catch (_) {
       state = state.copyWith(comments: snapshot);

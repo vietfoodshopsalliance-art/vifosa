@@ -1,6 +1,10 @@
 // lib/core/providers/dio_provider.dart
 
-// Re-export DioClient để các feature import từ đây thay vì trực tiếp.
-// Spec gốc (Phần 1) định nghĩa DioClient tại lib/core/network/dio_client.dart.
-
+import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 export '../network/dio_client.dart';
+
+import '../network/dio_client.dart';
+
+/// Provider trả về Dio singleton — dùng cho các Repository cần inject Dio.
+final dioProvider = Provider<Dio>((_) => DioClient.instance);

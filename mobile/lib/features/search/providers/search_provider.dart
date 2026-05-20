@@ -5,8 +5,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/services/api_service.dart';
-import '../../home/providers/home_feed_provider.dart'
-    show StoreCardModel, StoreStatus, StoreAddress, StoreStats;
+import '../../home/models/store_card.dart' show StoreCard;
 
 // ── Models ─────────────────────────────────────────────────────────
 
@@ -32,7 +31,7 @@ class MatchedItem {
 }
 
 class SearchResultItem {
-  final StoreCardModel store;
+  final StoreCard store;
   final List<MatchedItem> matchedItems;
 
   const SearchResultItem({
@@ -42,7 +41,7 @@ class SearchResultItem {
 
   factory SearchResultItem.fromJson(Map<String, dynamic> j) =>
       SearchResultItem(
-        store: StoreCardModel.fromJson(
+        store: StoreCard.fromJson(
             j['store'] as Map<String, dynamic>),
         matchedItems: (j['matchedItems'] as List? ?? [])
             .map((e) => MatchedItem.fromJson(e as Map<String, dynamic>))

@@ -3,7 +3,7 @@
 
 import 'package:flutter/material.dart';
 import '../../search/providers/search_provider.dart';
-import '../../../core/widgets/status_badge.dart';
+import '../../../shared/widgets/status_badge.dart';
 
 class SearchResultStoreCard extends StatelessWidget {
   final SearchResultItem storeResult;
@@ -48,7 +48,7 @@ class SearchResultStoreCard extends StatelessWidget {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: Image.network(
-                      store.avatarImage,
+                      store.avatarImage ?? '',
                       width: 48,
                       height: 48,
                       fit: BoxFit.cover,
@@ -82,8 +82,13 @@ class SearchResultStoreCard extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 6),
-                            // FIX: store.status là StoreStatus enum → dùng StatusBadge.store()
-                            StatusBadge.store(store.status),
+                            StatusBadge.store(
+                              store.emergencyClosed
+                                  ? StoreStatus.emergencyClosed
+                                  : store.isOpen
+                                      ? StoreStatus.open
+                                      : StoreStatus.preorder,
+                            ),
                           ],
                         ),
                         const SizedBox(height: 3),
@@ -93,7 +98,7 @@ class SearchResultStoreCard extends StatelessWidget {
                                 size: 13, color: Color(0xFFFFB300)),
                             const SizedBox(width: 2),
                             Text(
-                              store.stats.avgRating.toStringAsFixed(1),
+                              store.avgRating.toStringAsFixed(1),
                               style: const TextStyle(
                                   fontSize: 12, color: Color(0xFF555555)),
                             ),

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/models/category.dart';
-import '../../../core/models/menu_item.dart';
+import '../../../core/models/store.dart' show StoreStatus;
 import '../../../features/cart/cart_provider.dart';
 import '../store_detail_provider.dart';
 
@@ -87,7 +87,7 @@ class _CategorySection extends StatelessWidget {
 
 // ── MenuItemTile ──────────────────────────────────────────────────────────────
 class _MenuItemTile extends ConsumerWidget {
-  final MenuItem item;
+  final CategoryItem item;
   final String storeId;
   final String storeName;
 
@@ -99,7 +99,7 @@ class _MenuItemTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isSoldOut = item.stock != null && item.stock == 0;
+    final isSoldOut = !item.isAvailable;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -112,7 +112,7 @@ class _MenuItemTile extends ConsumerWidget {
             child: Opacity(
               opacity: isSoldOut ? 0.5 : 1.0,
               child: CachedNetworkImage(
-                imageUrl: item.imageUrl ?? '',
+                imageUrl: item.primaryImage ?? '',
                 width: 80,
                 height: 80,
                 fit: BoxFit.cover,
@@ -141,10 +141,10 @@ class _MenuItemTile extends ConsumerWidget {
                     color: isSoldOut ? Colors.grey : null,
                   ),
                 ),
-                if (item.description.isNotEmpty == true) ...[
+                if (item.description?.isNotEmpty == true) ...[
                   const SizedBox(height: 3),
                   Text(
-                    item.description,
+                    item.description ?? '',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
@@ -154,7 +154,7 @@ class _MenuItemTile extends ConsumerWidget {
                 Row(
                   children: [
                     Text(
-                      _formatPrice(item.price),
+                      _formatPrice(item.price.toDouble()),
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
@@ -162,9 +162,6 @@ class _MenuItemTile extends ConsumerWidget {
                       ),
                     ),
                     const Spacer(),
-                    // Like món
-                    _LikeItemButton(item: item),
-                    const SizedBox(width: 8),
                     // Nút thêm vào giỏ / Hết hàng
                     isSoldOut
                         ? Container(
@@ -200,54 +197,9 @@ class _MenuItemTile extends ConsumerWidget {
   }
 }
 
-// ── Like item button ──────────────────────────────────────────────────────────
-class _LikeItemButton extends ConsumerStatefulWidget {
-  final MenuItem item;
-
-  const _LikeItemButton({required this.item});
-
-  @override
-  ConsumerState<_LikeItemButton> createState() => _LikeItemButtonState();
-}
-
-class _LikeItemButtonState extends ConsumerState<_LikeItemButton> {
-  late bool _isLiked;
-
-  @override
-  void initState() {
-    super.initState();
-    _isLiked = widget.item.isLiked;
-  }
-
-  Future<void> _toggle() async {
-    setState(() => _isLiked = !_isLiked);
-    try {
-      if (_isLiked) {
-        await ref.read(cartProvider.notifier).likeItem(widget.item.id);
-      } else {
-        await ref.read(cartProvider.notifier).unlikeItem(widget.item.id);
-      }
-    } catch (_) {
-      setState(() => _isLiked = !_isLiked);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: _toggle,
-      child: Icon(
-        _isLiked ? Icons.favorite : Icons.favorite_border,
-        color: _isLiked ? Colors.red : Colors.grey,
-        size: 20,
-      ),
-    );
-  }
-}
-
 // ── Add to cart button ────────────────────────────────────────────────────────
 class _AddToCartButton extends ConsumerWidget {
-  final MenuItem item;
+  final CategoryItem item;
   final String storeId;
   final String storeName;
 
@@ -277,8 +229,8 @@ class _AddToCartButton extends ConsumerWidget {
     final cart = ref.read(cartProvider);
 
     // Pre-order nhắc nhở
-    if ((await ref.read(storeDetailProvider(storeId).future)).status ==
-        'pre_order') {
+    if ((await ref.read(storeDetailProvider(storeId).future)).displayStatus ==
+        StoreStatus.preOrder) {
       final confirm = await showDialog<bool>(
         context: context,
         builder: (_) => AlertDialog(
@@ -301,7 +253,7 @@ class _AddToCartButton extends ConsumerWidget {
     }
 
     // Giỏ từ quán khác
-    if (cart.isNotEmpty && cart.storeId != storeId) {
+    if (cart.items.isNotEmpty && cart.storeId != storeId) {
       final confirm = await showDialog<bool>(
         context: context,
         builder: (_) => AlertDialog(
@@ -325,7 +277,17 @@ class _AddToCartButton extends ConsumerWidget {
       ref.read(cartProvider.notifier).clearCart();
     }
 
-    ref.read(cartProvider.notifier).addItem(item, context,
-        storeId: storeId, storeName: storeName);
+    ref.read(cartProvider.notifier).addItem(
+      CartItem(
+        itemId: item.id,
+        name: item.name,
+        price: item.price.toDouble(),
+        imageUrl: item.primaryImage ?? '',
+        quantity: 1,
+        stock: item.stock,
+      ),
+      storeId,
+      storeName,
+    );
   }
 }

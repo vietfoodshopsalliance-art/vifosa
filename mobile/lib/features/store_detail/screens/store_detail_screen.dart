@@ -10,12 +10,12 @@ import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/item_card.dart';
 
 final storeDetailProvider = FutureProvider.autoDispose.family<Map<String, dynamic>, String>((ref, id) async {
-  final res = await DioClient().dio.get(ApiEndpoints.storeDetail(id));
+  final res = await DioClient.instance.get(ApiEndpoints.storeDetail(id));
   return Map<String, dynamic>.from(res.data);
 });
 
 final storeMenuProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>((ref, id) async {
-  final res = await DioClient().dio.get(ApiEndpoints.storeMenu(id));
+  final res = await DioClient.instance.get(ApiEndpoints.storeMenu(id));
   return List<Map<String, dynamic>>.from(res.data['categories'] ?? res.data);
 });
 
@@ -241,7 +241,7 @@ SliverToBoxAdapter(
   }
 
   void _toggleFavorite(WidgetRef ref, String id) {
-    DioClient().dio.post(ApiEndpoints.favorites, data: {'storeId': id}).catchError((_) {});
+    DioClient.instance.post(ApiEndpoints.favoriteStores, data: {'storeId': id}).catchError((_) {});
   }
 
   void _showReviews(BuildContext context, String id) {

@@ -38,7 +38,7 @@ class ImageService {
   static final instance = ImageService._();
 
   final _picker = ImagePicker();
-  final _dio = DioClient().dio;
+  final _dio = DioClient.instance;
 
   // ── Chọn ảnh ───────────────────────────────────────────────────────────────
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/storage/secure_storage.dart';
 import '../providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -14,7 +15,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey        = GlobalKey<FormState>();
   final _credentialCtrl = TextEditingController();
   final _passwordCtrl   = TextEditingController();
-  bool _obscure = true;
+  bool _obscure     = true;
+  bool _rememberMe  = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    final saved = await SecureStorage.getRememberMe();
+    if (saved != null && mounted) {
+      setState(() {
+        _credentialCtrl.text = saved.credential;
+        _passwordCtrl.text   = saved.password;
+        _rememberMe          = true;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -25,9 +44,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    final credential = _credentialCtrl.text.trim();
+    final password   = _passwordCtrl.text;
+    if (_rememberMe) {
+      await SecureStorage.saveRememberMe(credential, password);
+    } else {
+      await SecureStorage.clearRememberMe();
+    }
     await ref.read(authProvider.notifier).login(
-      credential: _credentialCtrl.text.trim(),
-      password:   _passwordCtrl.text,
+      credential: credential,
+      password:   password,
     );
   }
 
@@ -119,13 +145,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 8),
 
-                // Quên mật khẩu — spec UA-3: MVP liên hệ admin
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () => _showForgotDialog(context),
-                    child: const Text('Quên mật khẩu?'),
-                  ),
+                // Ghi nhớ mật khẩu + Quên mật khẩu
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _rememberMe,
+                      activeColor: Colors.orange,
+                      onChanged: (v) => setState(() => _rememberMe = v ?? false),
+                    ),
+                    GestureDetector(
+                      onTap: () => setState(() => _rememberMe = !_rememberMe),
+                      child: const Text('Ghi nhớ mật khẩu'),
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () => _showForgotDialog(context),
+                      child: const Text('Quên mật khẩu?'),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 24),
 

@@ -15,7 +15,7 @@ final _vnd = NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits
 final _storePaymentMethodsProvider =
     FutureProvider.autoDispose.family<List<String>, String>((ref, storeId) async {
   if (storeId.isEmpty) return ['cod'];
-  final res = await DioClient().dio.get(ApiEndpoints.storeById(storeId));
+  final res = await DioClient.instance.get(ApiEndpoints.storeById(storeId));
   final raw = res.data as Map<String, dynamic>;
   final store = (raw['store'] ?? raw) as Map<String, dynamic>;
   final pm = store['paymentMethods'] as Map? ?? {};
@@ -81,7 +81,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     try {
       String? firstOrderId;
       for (final entry in grouped.entries) {
-        final res = await DioClient().dio.post(ApiEndpoints.orders, data: {
+        final res = await DioClient.instance.post(ApiEndpoints.orders, data: {
           'storeId': entry.key,
           'items': entry.value,
           'deliveryMethod': _deliveryMethod,

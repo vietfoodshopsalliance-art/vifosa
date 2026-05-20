@@ -127,7 +127,7 @@ class _SocialFeedScreenState extends ConsumerState<SocialFeedScreen> {
               onPressed: () async {
                 Navigator.pop(ctx);
                 try {
-                  await DioClient().dio.post('/reports', data: {
+                  await DioClient.instance.post('/reports', data: {
                     'targetType': targetType,
                     'targetId': targetId,
                     'reason': selectedReason,

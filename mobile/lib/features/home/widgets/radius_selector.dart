@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../home_provider.dart';
+import '../providers/home_feed_provider.dart';
 
 class RadiusSelector extends ConsumerWidget {
   const RadiusSelector({super.key});

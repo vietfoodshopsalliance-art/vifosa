@@ -58,24 +58,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     });
 
     return const Scaffold(
-      backgroundColor: Color(0xFFE53935),
+      backgroundColor: Color(0xFFF4B400),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Thay bằng logo thật nếu có
-            Icon(Icons.restaurant, size: 80, color: Colors.white),
-            SizedBox(height: 16),
-            Text(
-              'Vifosa',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                letterSpacing: 2,
-              ),
+            Image(
+              image: AssetImage('assets/images/app_icon.png'),
+              width: 200,
+              height: 200,
             ),
-            SizedBox(height: 32),
+            SizedBox(height: 40),
             CircularProgressIndicator(color: Colors.white),
           ],
         ),

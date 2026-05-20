@@ -68,7 +68,7 @@ for (var i = 0; i < _selectedImages.length; i++) {
   urls.add(uploaded.url);
 }
 
-      final res = await DioClient().dio.post(
+      final res = await DioClient.instance.post(
         ApiEndpoints.posts,
         data: {
           'images': urls,
@@ -449,8 +449,7 @@ class _SearchResultsListState extends State<_SearchResultsList> {
     if (widget.query.isEmpty) return;
     setState(() => _loading = true);
     try {
-      final res = await DioClient()
-          .dio
+      final res = await DioClient.instance
           .get('/search', queryParameters: {'q': widget.query});
       final items = (res.data as List).map((e) {
         final m = e as Map<String, dynamic>;

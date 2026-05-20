@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../providers/menu_provider.dart';
-import '../../../store/providers/item_form_provider.dart';
 
 class AddEditItemScreen extends ConsumerStatefulWidget {
   final String storeId;

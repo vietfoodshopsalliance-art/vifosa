@@ -52,7 +52,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Future<void> _doSearch(String q) async {
     setState(() => _loading = true);
     try {
-      final res = await DioClient().dio.get(
+      final res = await DioClient.instance.get(
         ApiEndpoints.search,
         queryParameters: {'q': q},
       );

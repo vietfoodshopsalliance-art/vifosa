@@ -10,28 +10,11 @@ class InfoTab extends StatelessWidget {
 
   const InfoTab({super.key, required this.store});
 
-  static const _dayLabels = {
-    'mon': 'Thứ 2',
-    'tue': 'Thứ 3',
-    'wed': 'Thứ 4',
-    'thu': 'Thứ 5',
-    'fri': 'Thứ 6',
-    'sat': 'Thứ 7',
-    'sun': 'Chủ nhật',
-  };
-
   Future<void> _openMaps(String address) async {
     final query = Uri.encodeComponent(address);
     final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
-
-  Future<void> _callPhone(String phone) async {
-    final uri = Uri.parse('tel:$phone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
     }
   }
 
@@ -68,32 +51,19 @@ class InfoTab extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          // ── SĐT (nếu public) ─────────────────────────────────────────
-          if (store.phone?.isNotEmpty == true) ...[
-            _InfoRow(
-              icon: Icons.phone_outlined,
-              child: GestureDetector(
-                onTap: () => _callPhone(store.phone!),
-                child: Text(
-                  store.phone!,
-                  style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(context).colorScheme.primary,
-                      decoration: TextDecoration.underline),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
-
           // ── Giờ mở ───────────────────────────────────────────────────
           _InfoRow(
             icon: Icons.access_time_outlined,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: _dayLabels.entries.map((e) {
-                final hours = store.openHours[e.key];
-                final isClosed = hours == null || !hours.isOpen;
+              children: List.generate(7, (index) {
+                // dayOfWeek: 0=Sun, 1=Mon..6=Sat; show Mon-Sun order
+                final dow = index + 1 <= 6 ? index + 1 : 0;
+                final dayName = const [
+                  'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'
+                ][index];
+                final h = store.openingHours.where((h) => h.dayOfWeek == dow).firstOrNull;
+                final isClosed = h == null || h.isClosed;
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 2),
                   child: Row(
@@ -101,20 +71,16 @@ class InfoTab extends StatelessWidget {
                       SizedBox(
                         width: 72,
                         child: Text(
-                          e.value,
+                          dayName,
                           style: TextStyle(
                             fontSize: 13,
-                            fontWeight: isClosed
-                                ? FontWeight.normal
-                                : FontWeight.w500,
+                            fontWeight: isClosed ? FontWeight.normal : FontWeight.w500,
                             color: isClosed ? Colors.grey : null,
                           ),
                         ),
                       ),
                       Text(
-                        isClosed
-                            ? 'Đóng cả ngày'
-                            : '${hours!.open} - ${hours.close}',
+                        isClosed ? 'Đóng cả ngày' : '${h!.open} - ${h.close}',
                         style: TextStyle(
                           fontSize: 13,
                           color: isClosed ? Colors.grey : null,
@@ -123,36 +89,10 @@ class InfoTab extends StatelessWidget {
                     ],
                   ),
                 );
-              }).toList(),
+              }),
             ),
           ),
           const SizedBox(height: 20),
-
-          // ── Ảnh thêm ─────────────────────────────────────────────────
-          if (store.extraImages?.isNotEmpty == true) ...[
-            const Text(
-              'Ảnh thêm',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 100,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: store.extraImages!.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, i) => ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: CachedNetworkImage(
-                    imageUrl: store.extraImages![i],
-                    width: 100,
-                    height: 100,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );

@@ -20,8 +20,9 @@ class AuthRepository {
       'phone':    phone,
       'password': password,
     });
-    await _saveTokens(res.data);
-    return res.data;
+    final payload = res.data['data'] as Map<String, dynamic>;
+    await _saveTokens(payload);
+    return payload;
   }
 
   Future<Map<String, dynamic>> login({
@@ -29,11 +30,12 @@ class AuthRepository {
     required String password,
   }) async {
     final res = await _dio.post(ApiEndpoints.login, data: {
-      'credential': credential,
+      'identifier': credential,
       'password':   password,
     });
-    await _saveTokens(res.data);
-    return res.data;
+    final payload = res.data['data'] as Map<String, dynamic>;
+    await _saveTokens(payload);
+    return payload;
   }
 
   Future<void> logout() async {
@@ -45,7 +47,7 @@ class AuthRepository {
 
   Future<Map<String, dynamic>> getMe() async {
     final res = await _dio.get(ApiEndpoints.me);
-    return res.data;
+    return res.data['data'] as Map<String, dynamic>;
   }
 
   Future<void> saveFcmToken(String token) async {

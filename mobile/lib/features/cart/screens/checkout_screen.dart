@@ -7,7 +7,7 @@ import 'package:intl/intl.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/widgets/app_button.dart';
-import 's2-cart.dart' show cartProvider;
+import '../cart_provider.dart' show cartProvider;
 
 final _vnd = NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
 
@@ -42,29 +42,27 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       _errorMsg = null;
     });
     final cart = ref.read(cartProvider);
-    // Group items by store → create order per store
-    final Map<String, List<dynamic>> grouped = {};
-    for (final item in cart) {
-      grouped.putIfAbsent(item.storeId, () => []).add({
-        'itemId': item.itemId,
-        'quantity': item.quantity,
-        'price': item.price,
-      });
+    final storeId = cart.storeId;
+    if (storeId == null || cart.items.isEmpty) {
+      setState(() => _errorMsg = 'Giỏ hàng trống');
+      setState(() => _loading = false);
+      return;
     }
+    final items = cart.items.map((item) => {
+      'itemId': item.itemId,
+      'quantity': item.quantity,
+      'price': item.price,
+    }).toList();
     try {
-      // Đặt hàng cho từng store
-      String? firstOrderId;
-      for (final entry in grouped.entries) {
-        final res = await DioClient().dio.post(ApiEndpoints.orders, data: {
-          'storeId': entry.key,
-          'items': entry.value,
-          'deliveryAddress': _addressCtrl.text.trim(),
-          'paymentMethod': _paymentMethod,
-          'note': _noteCtrl.text.trim(),
-        });
-        firstOrderId ??= res.data['order']?['_id'] ?? res.data['_id'];
-      }
-      ref.read(cartProvider.notifier).clear();
+      final res = await DioClient.instance.post(ApiEndpoints.orders, data: {
+        'storeId': storeId,
+        'items': items,
+        'deliveryAddress': _addressCtrl.text.trim(),
+        'paymentMethod': _paymentMethod,
+        'note': _noteCtrl.text.trim(),
+      });
+      final firstOrderId = res.data['order']?['_id'] ?? res.data['_id'];
+      ref.read(cartProvider.notifier).clearCart();
       if (!mounted) return;
       if (firstOrderId != null) {
         context.go('/order/$firstOrderId');
@@ -113,7 +111,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 padding: const EdgeInsets.all(12),
                 child: Column(
                   children: [
-                    ...cart.map((item) => Padding(
+                    ...cart.items.map((item) => Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Row(
                         children: [
@@ -128,7 +126,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       children: [
                         const Text('Tổng cộng:', style: TextStyle(fontWeight: FontWeight.bold)),
                         Text(
-                          _vnd.format(notifier.totalPrice),
+                          _vnd.format(cart.subtotal),
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,

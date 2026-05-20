@@ -13,7 +13,7 @@ final guestTrackingProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>, ({String code, String? token})>((ref, args) async {
   final queryParams = <String, dynamic>{'code': args.code};
   if (args.token != null) queryParams['t'] = args.token;
-  final res = await DioClient().dio.get('/track', queryParameters: queryParams);
+  final res = await DioClient.instance.get('/track', queryParameters: queryParams);
   return Map<String, dynamic>.from(res.data['order'] ?? res.data);
 });
 

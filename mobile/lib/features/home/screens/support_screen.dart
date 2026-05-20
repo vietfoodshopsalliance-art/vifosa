@@ -36,7 +36,7 @@ class _SupportScreenState extends ConsumerState<SupportScreen> {
     }
     setState(() => _loading = true);
     try {
-      await DioClient().dio.post(ApiEndpoints.supportTickets, data: {
+      await DioClient.instance.post(ApiEndpoints.supportTickets, data: {
         'category': _category,
         'subject': _subjectCtrl.text.trim(),
         'body': _bodyCtrl.text.trim(),

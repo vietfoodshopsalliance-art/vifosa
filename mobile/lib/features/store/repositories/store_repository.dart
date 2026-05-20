@@ -8,31 +8,38 @@ class StoreRepository {
 
   Future<List<StoreModel>> getMyStores() async {
     final res = await dio.get('/me/stores');
-    return (res.data['stores'] as List).map((e) => StoreModel.fromJson(e)).toList();
+    final raw = res.data;
+    final list = raw is List ? raw : (raw as Map)['stores'] as List? ?? [];
+    return list.map((e) => StoreModel.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<StoreModel> getStore(String storeId) async {
-    final res = await dio.get('/stores/$storeId');
-    return StoreModel.fromJson(res.data['store']);
+    final res = await dio.get('/me/stores/$storeId');
+    final raw = res.data;
+    return StoreModel.fromJson(raw is Map<String, dynamic> ? raw : raw['store']);
   }
 
   Future<StoreModel> createStore(Map<String, dynamic> data) async {
-    final res = await dio.post('/stores', data: data);
-    return StoreModel.fromJson(res.data['store']);
+    final res = await dio.post('/me/stores', data: data);
+    final raw = res.data;
+    return StoreModel.fromJson(raw is Map<String, dynamic> ? raw : raw['store']);
   }
 
   Future<StoreModel> updateStore(String storeId, Map<String, dynamic> data) async {
-    final res = await dio.patch('/stores/$storeId', data: data);
-    return StoreModel.fromJson(res.data['store']);
+    final res = await dio.patch('/me/stores/$storeId', data: data);
+    final raw = res.data;
+    return StoreModel.fromJson(raw is Map<String, dynamic> ? raw : raw['store']);
   }
 
   Future<StoreModel> updateAvatar(String storeId, String avatarUrl) async {
-    final res = await dio.post('/stores/$storeId/avatar', data: {'avatarUrl': avatarUrl});
-    return StoreModel.fromJson(res.data['store']);
+    final res = await dio.post('/me/stores/$storeId/avatar', data: {'avatarUrl': avatarUrl});
+    final raw = res.data;
+    return StoreModel.fromJson(raw is Map<String, dynamic> ? raw : raw['store']);
   }
 
   Future<StoreModel> updateCover(String storeId, String coverUrl) async {
-    final res = await dio.post('/stores/$storeId/cover', data: {'coverUrl': coverUrl});
-    return StoreModel.fromJson(res.data['store']);
+    final res = await dio.post('/me/stores/$storeId/cover', data: {'coverUrl': coverUrl});
+    final raw = res.data;
+    return StoreModel.fromJson(raw is Map<String, dynamic> ? raw : raw['store']);
   }
 }

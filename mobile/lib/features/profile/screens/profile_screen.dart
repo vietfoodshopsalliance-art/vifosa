@@ -11,10 +11,13 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
-    final user = authState.user!;
+    final user = authState.user ?? {};
 
-    final roles = user.roles;
-    final isStoreOwner = user.isStoreOwner;
+    final roles = (user['roles'] as List<dynamic>? ?? []).cast<String>();
+    final isStoreOwner = roles.contains('store_owner');
+    final avatarUrl = user['avatarImage'] as String?;
+    final nickname = user['nickname'] as String? ?? '';
+    final username = user['username'] as String? ?? '';
 
     return Scaffold(
       appBar: AppBar(
@@ -32,11 +35,10 @@ class ProfileScreen extends ConsumerWidget {
             CircleAvatar(
               radius: 48,
               backgroundImage:
-                  user.avatar != null ? NetworkImage(user.avatar!) : null,
-              child: user.avatar == null
+                  avatarUrl != null ? NetworkImage(avatarUrl) : null,
+              child: avatarUrl == null
                   ? Text(
-                      (user.nickname.isNotEmpty ? user.nickname : 'U')[0]
-                          .toUpperCase(),
+                      (nickname.isNotEmpty ? nickname : 'U')[0].toUpperCase(),
                       style: const TextStyle(fontSize: 32),
                     )
                   : null,
@@ -45,16 +47,17 @@ class ProfileScreen extends ConsumerWidget {
 
             // Nickname
             Text(
-              user.nickname,
+              nickname,
               style: Theme.of(context).textTheme.titleLarge,
             ),
 
-            // Username — không đổi được (UA-4)
+            // Username
             Text(
-              '@${user.username}',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey,
-                  ),
+              '@$username',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: Colors.grey),
             ),
 
             const SizedBox(height: 8),
@@ -67,17 +70,14 @@ class ProfileScreen extends ConsumerWidget {
 
             const SizedBox(height: 24),
 
-            // Store owner shortcut (UA-1)
+            // Store owner shortcut
             if (isStoreOwner)
               ElevatedButton.icon(
                 icon: const Icon(Icons.store),
                 label: const Text('Quản lý quán'),
-                onPressed: () {
-                  // TODO: navigate to store dashboard
-                },
+                onPressed: () => context.push('/my-stores'),
               ),
 
-            // ─── Nút Đăng xuất ───────────────────────────────────────────
             const Spacer(),
 
             OutlinedButton.icon(
@@ -100,7 +100,6 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  // Hiện dialog xác nhận trước khi logout
   void _confirmLogout(BuildContext context, WidgetRef ref) {
     showDialog<void>(
       context: context,
@@ -115,15 +114,11 @@ class ProfileScreen extends ConsumerWidget {
           TextButton(
             onPressed: () async {
               Navigator.of(ctx).pop();
-
               await ref.read(authProvider.notifier).logout();
-
               if (context.mounted) context.go('/login');
             },
-            child: const Text(
-              'Đăng xuất',
-              style: TextStyle(color: Colors.red),
-            ),
+            child: const Text('Đăng xuất',
+                style: TextStyle(color: Colors.red)),
           ),
         ],
       ),

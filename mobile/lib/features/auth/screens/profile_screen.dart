@@ -14,7 +14,13 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider);
+    final user = auth.user ?? {};
     final theme = Theme.of(context);
+
+    final nickname = user['nickname'] as String? ?? '';
+    final avatarUrl = user['avatarImage'] as String?;
+    final roles = (user['roles'] as List<dynamic>? ?? []).cast<String>();
+    final isStoreOwner = roles.contains('store_owner');
 
     return Scaffold(
       appBar: AppBar(title: const Text('Hồ sơ của tôi')),
@@ -27,9 +33,9 @@ class ProfileScreen extends ConsumerWidget {
             child: Row(
               children: [
                 UserAvatar(
-                  imageUrl: auth.avatar,
-                  nickname: auth.nickname ?? 'U',
-                  size: 64,
+                  url: avatarUrl,
+                  fallbackLabel: nickname.isNotEmpty ? nickname : 'U',
+                  radius: 32,
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -37,20 +43,23 @@ class ProfileScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        auth.nickname ?? 'Người dùng',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        nickname.isNotEmpty ? nickname : 'Người dùng',
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        auth.roles.map(_roleLabel).join(' · '),
-                        style: TextStyle(color: theme.colorScheme.primary, fontSize: 13),
+                        roles.map(_roleLabel).join(' · '),
+                        style: TextStyle(
+                            color: theme.colorScheme.primary, fontSize: 13),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.edit_outlined),
-                  onPressed: () => _showEditNickname(context, ref, auth.nickname ?? ''),
+                  onPressed: () =>
+                      _showEditNickname(context, ref, nickname),
                 ),
               ],
             ),
@@ -87,27 +96,21 @@ class ProfileScreen extends ConsumerWidget {
             title: 'Hỗ trợ',
             onTap: () => context.push('/support'),
           ),
-          _ProfileTile(
-            icon: Icons.description_outlined,
-            title: 'Điều khoản sử dụng',
-            onTap: () => context.push('/tos'),
-          ),
           const Divider(height: 24),
-          if (auth.isStoreOwner)
+          if (isStoreOwner)
             _ProfileTile(
               icon: Icons.storefront_outlined,
               title: 'Quản lý cửa hàng',
-              onTap: () {
-                ref.read(authProvider.notifier).switchRole('store_owner');
-                context.go('/store-dashboard');
-              },
+              onTap: () => context.push('/my-stores'),
               trailing: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
+                  color: theme.colorScheme.primary,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Text('Chủ cửa hàng', style: TextStyle(color: Colors.white, fontSize: 11)),
+                child: const Text('Chủ cửa hàng',
+                    style: TextStyle(color: Colors.white, fontSize: 11)),
               ),
             ),
           _ProfileTile(
@@ -123,15 +126,17 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   String _roleLabel(String role) {
-    switch (role) {
-      case 'customer': return 'Khách hàng';
-      case 'store_owner': return 'Chủ cửa hàng';
-      case 'admin': return 'Quản trị';
-      default: return role;
-    }
+    return switch (role) {
+      'customer'    => 'Khách hàng',
+      'store_owner' => 'Chủ cửa hàng',
+      'admin'       => 'Quản trị',
+      'mod'         => 'Kiểm duyệt',
+      _             => role,
+    };
   }
 
-  void _showEditNickname(BuildContext context, WidgetRef ref, String current) {
+  void _showEditNickname(
+      BuildContext context, WidgetRef ref, String current) {
     final ctrl = TextEditingController(text: current);
     showDialog(
       context: context,
@@ -139,16 +144,22 @@ class ProfileScreen extends ConsumerWidget {
         title: const Text('Đổi tên hiển thị'),
         content: TextField(
           controller: ctrl,
-          decoration: const InputDecoration(labelText: 'Tên hiển thị', border: OutlineInputBorder()),
+          decoration: const InputDecoration(
+              labelText: 'Tên hiển thị',
+              border: OutlineInputBorder()),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Hủy')),
           TextButton(
             onPressed: () async {
               if (ctrl.text.trim().isEmpty) return;
               try {
-                await DioClient().dio.patch(ApiEndpoints.me, data: {'nickname': ctrl.text.trim()});
-                await ref.read(authProvider.notifier).loadFromStorage();
+                await DioClient.instance
+                    .patch(ApiEndpoints.me, data: {'nickname': ctrl.text.trim()});
+                // Reload user info
+                ref.invalidate(authProvider);
               } catch (_) {}
               if (context.mounted) Navigator.pop(context);
             },
@@ -166,17 +177,17 @@ class ProfileScreen extends ConsumerWidget {
         title: const Text('Đăng xuất'),
         content: const Text('Bạn có chắc muốn đăng xuất?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Hủy')),
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              try {
-                await DioClient().dio.post(ApiEndpoints.logout);
-              } catch (_) {}
               await ref.read(authProvider.notifier).logout();
               if (context.mounted) context.go('/login');
             },
-            child: const Text('Đăng xuất', style: TextStyle(color: Colors.red)),
+            child: const Text('Đăng xuất',
+                style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -204,7 +215,8 @@ class _ProfileTile extends StatelessWidget {
     return ListTile(
       leading: Icon(icon, color: titleColor),
       title: Text(title, style: TextStyle(color: titleColor)),
-      trailing: trailing ?? const Icon(Icons.chevron_right, color: Colors.grey),
+      trailing:
+          trailing ?? const Icon(Icons.chevron_right, color: Colors.grey),
       onTap: onTap,
     );
   }

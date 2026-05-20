@@ -1,6 +1,7 @@
 // lib/features/store_dashboard/menu/widgets/menu_item_tile.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/menu_provider.dart';
 
 class MenuItemTile extends StatelessWidget {

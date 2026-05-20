@@ -8,7 +8,7 @@ import '../../../core/widgets/app_button.dart';
 
 // Addresses lưu trong profile user — lấy từ GET /me
 final addressesProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  final res = await DioClient().dio.get(ApiEndpoints.me);
+  final res = await DioClient.instance.get(ApiEndpoints.me);
   final addresses = res.data['addresses'] ?? [];
   return List<Map<String, dynamic>>.from(addresses);
 });
@@ -153,7 +153,7 @@ class _AddressSheetState extends State<_AddressSheet> {
     setState(() => _loading = true);
     try {
       // PATCH /me với addresses mới (tuỳ API design)
-      await DioClient().dio.patch(ApiEndpoints.me, data: {
+      await DioClient.instance.patch(ApiEndpoints.me, data: {
         'address': {
           'label': _label,
           'address': _addressCtrl.text.trim(),

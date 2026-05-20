@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/menu_provider.dart';
-import '../../../store/widgets/category_drag_tile.dart';
+import '../../../store/widgets/category_drag_tile.dart' hide CategoryDragTile;
 import '../widgets/menu_item_tile.dart';
 import 'add_edit_item_screen.dart';
 import 'add_edit_category_sheet.dart';

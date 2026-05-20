@@ -10,7 +10,7 @@ import '../../../core/network/api_endpoints.dart';
 final _dateFormat = DateFormat('dd/MM HH:mm');
 
 final notificationsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  final res = await DioClient().dio.get(ApiEndpoints.notifications);
+  final res = await DioClient.instance.get(ApiEndpoints.notifications);
   return List<Map<String, dynamic>>.from(res.data['notifications'] ?? res.data);
 });
 
@@ -28,7 +28,7 @@ class NotificationsScreen extends ConsumerWidget {
           TextButton(
             onPressed: () {
               // Mark all read
-              DioClient().dio.put('${ApiEndpoints.notifications}/read-all').catchError((_) {});
+              DioClient.instance.put('${ApiEndpoints.notifications}/read-all').catchError((_) {});
               ref.invalidate(notificationsProvider);
             },
             child: const Text('Đọc tất cả'),

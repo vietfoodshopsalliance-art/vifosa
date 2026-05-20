@@ -19,6 +19,7 @@ class AuthState {
   final String? error;
 
   bool get isAuthenticated => status == AuthStatus.authenticated;
+  bool get isLoading => status == AuthStatus.initial || status == AuthStatus.loading;
 
   AuthState copyWith({
     AuthStatus? status,

@@ -24,7 +24,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     super.initState();
     // ← ĐÃ SỬA: dùng ref.read(authProvider).user thay vì user?['nickname']
     final user = ref.read(authProvider).user;
-    _nicknameCtrl.text = user?.nickname ?? '';
+    _nicknameCtrl.text = user?['nickname'] as String? ?? '';
   }
 
   Future<void> _pickAndUploadAvatar() async {
@@ -40,7 +40,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         transformation: 'w_400,h_400,c_fill,g_face,f_auto,q_auto',
       );
       await ref.read(profileRepositoryProvider).updateAvatar(url);
-      await ref.read(authProvider.notifier).refreshUser();
+      ref.invalidate(authProvider);
     } finally {
       setState(() => _loading = false);
     }
@@ -52,7 +52,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       await ref.read(profileRepositoryProvider).updateMe({
         'nickname': _nicknameCtrl.text.trim(),
       });
-      await ref.read(authProvider.notifier).refreshUser();
+      ref.invalidate(authProvider);
       if (mounted) Navigator.pop(context);
     } finally {
       setState(() => _loading = false);
@@ -62,6 +62,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user; // ← watch ở build, read ở initState
+    final avatarUrl = user?['avatarImage'] as String?;
+    final nickname = user?['nickname'] as String? ?? 'U';
 
     return Scaffold(
       appBar: AppBar(
@@ -85,14 +87,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       children: [
                         CircleAvatar(
                           radius: 48,
-                          backgroundImage: user?.avatar != null // ← ĐÃ SỬA
-                              ? NetworkImage(user!.avatar!)
+                          backgroundImage: avatarUrl != null
+                              ? NetworkImage(avatarUrl)
                               : null,
-                          child: user?.avatar == null
+                          child: avatarUrl == null
                               ? Text(
-                                  (user?.nickname ?? 'U').isNotEmpty
-                                      ? (user?.nickname ?? 'U')[0].toUpperCase()
-                                      : 'U',
+                                  nickname.isNotEmpty ? nickname[0].toUpperCase() : 'U',
                                   style: const TextStyle(fontSize: 32),
                                 )
                               : null,

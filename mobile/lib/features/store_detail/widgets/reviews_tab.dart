@@ -139,7 +139,7 @@ class _ReviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isAnonymous = review.userId == null || review.nickname == null;
+    final isAnonymous = review.fromUserId == null || review.nickname == null;
     final displayName = isAnonymous ? 'Người dùng ẩn danh' : review.nickname!;
     final dateStr = DateFormat('dd/MM/yyyy').format(review.createdAt);
 
@@ -176,7 +176,7 @@ class _ReviewCard extends StatelessWidget {
                         ...List.generate(
                           5,
                           (i) => Icon(
-                            i < review.rating
+                            i < review.stars
                                 ? Icons.star
                                 : Icons.star_border,
                             color: Colors.amber,
@@ -222,7 +222,7 @@ class _ReviewCard extends StatelessWidget {
             ),
           ],
           // Store reply
-          if (review.storeReply?.isNotEmpty == true) ...[
+          if (review.reply != null) ...[
             const SizedBox(height: 10),
             Container(
               margin: const EdgeInsets.only(left: 16),
@@ -245,7 +245,7 @@ class _ReviewCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    review.storeReply!,
+                    review.reply!.text,
                     style: const TextStyle(fontSize: 12),
                   ),
                 ],

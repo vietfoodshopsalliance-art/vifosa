@@ -12,7 +12,7 @@ final _vnd = NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits
 final _dateFormat = DateFormat('dd/MM/yyyy HH:mm');
 
 final ordersListProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  final res = await DioClient().dio.get(ApiEndpoints.orders);
+  final res = await DioClient.instance.get(ApiEndpoints.orders);
   return List<Map<String, dynamic>>.from(res.data['orders'] ?? res.data);
 });
 

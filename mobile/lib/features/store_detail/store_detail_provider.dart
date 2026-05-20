@@ -5,7 +5,7 @@ import '../../core/models/store.dart';
 import '../../core/models/category.dart';
 import '../../core/models/review.dart';
 import '../../core/network/dio_client.dart';
-import '../../core/constants/api_endpoints.dart';
+import '../../core/network/api_endpoints.dart';
 
 // ---------------------------------------------------------------------------
 // Store detail
@@ -13,7 +13,7 @@ import '../../core/constants/api_endpoints.dart';
 final storeDetailProvider =
     FutureProvider.family<Store, String>((ref, storeId) async {
   final res =
-      await DioClient().dio.get(ApiEndpoints.storeDetail(storeId));
+      await DioClient.instance.get(ApiEndpoints.storeDetail(storeId));
   return Store.fromJson(res.data as Map<String, dynamic>);
 });
 
@@ -23,7 +23,7 @@ final storeDetailProvider =
 final storeMenuProvider =
     FutureProvider.family<List<Category>, String>((ref, storeId) async {
   final res =
-      await DioClient().dio.get(ApiEndpoints.storeMenu(storeId));
+      await DioClient.instance.get(ApiEndpoints.storeMenu(storeId));
   return (res.data['categories'] as List)
       .map((e) => Category.fromJson(e as Map<String, dynamic>))
       .toList();
@@ -39,7 +39,7 @@ final storeLikeProvider =
   final detail = ref.watch(storeDetailProvider(storeId));
   return StoreLikeNotifier(
     storeId: storeId,
-    initial: detail.valueOrNull?.isLiked ?? false,
+    initial: detail.valueOrNull?.likeId != null,
   );
 });
 
@@ -55,7 +55,7 @@ class StoreLikeNotifier extends StateNotifier<AsyncValue<bool>> {
     state = const AsyncValue.loading();
     try {
       if (!current) {
-        final res = await DioClient().dio.post(
+        final res = await DioClient.instance.post(
           ApiEndpoints.likes,
           data: {'type': 'store', 'targetId': storeId},
         );
@@ -63,7 +63,7 @@ class StoreLikeNotifier extends StateNotifier<AsyncValue<bool>> {
         state = const AsyncValue.data(true);
       } else {
         if (_likeId != null) {
-          await DioClient().dio.delete(ApiEndpoints.likeDelete(_likeId!));
+          await DioClient.instance.delete(ApiEndpoints.likeDelete(_likeId!));
         }
         state = const AsyncValue.data(false);
       }
@@ -136,7 +136,7 @@ class ReviewsNotifier extends StateNotifier<ReviewsState> {
 
   Future<void> _fetch({required int page}) async {
     try {
-      final res = await DioClient().dio.get(
+      final res = await DioClient.instance.get(
         ApiEndpoints.storeReviews(storeId),
         queryParameters: {
           if (state.ratingFilter != null) 'rating': state.ratingFilter,

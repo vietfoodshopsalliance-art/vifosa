@@ -1,7 +1,8 @@
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/env.dart';
 import '../storage/secure_storage.dart';
-import 'api_endpoints.dart'; // ← fix lỗi 2: thiếu import này
+import 'api_endpoints.dart';
 
 class DioClient {
   static Dio? _instance;
@@ -83,7 +84,9 @@ class _AuthInterceptor extends QueuedInterceptorsWrapper {
       data: {'refreshToken': refreshToken},
     );
 
-    final data = response.data as Map<String, dynamic>;
+    // Spec v3.1: response bọc trong { success, data: { accessToken, refreshToken } }
+    final body = response.data as Map<String, dynamic>;
+    final data = (body['data'] ?? body) as Map<String, dynamic>;
     final newAccess  = data['accessToken']  as String;
     final newRefresh = data['refreshToken'] as String;
 
@@ -93,3 +96,11 @@ class _AuthInterceptor extends QueuedInterceptorsWrapper {
     return newAccess;
   }
 }
+
+// ── Riverpod wrapper ─────────────────────────────────────────────────────────
+
+class DioClientRef {
+  final Dio dio = DioClient.instance;
+}
+
+final dioClientProvider = Provider<DioClientRef>((_) => DioClientRef());

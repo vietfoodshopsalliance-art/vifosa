@@ -34,7 +34,7 @@ class _SupportScreenState extends ConsumerState<SupportScreen> {
     setState(() => _loading = true);
 
     try {
-      final dio = Dio(BaseOptions(baseUrl: apiBaseUrl));
+      final dio = Dio(BaseOptions(baseUrl: Env.apiBaseUrl));
       // Đính kèm token từ storage nếu user đã đăng nhập
       // (AuthNotifier inject token qua interceptor — giả sử đã setup ở core)
       await dio.post('/support/tickets', data: {

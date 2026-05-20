@@ -76,7 +76,7 @@ class CommentTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           UserAvatar(
-            avatarUrl: comment.avatarUrl,
+            url: comment.avatarUrl,
             radius: isReply ? 14 : 16,
           ),
           const SizedBox(width: 8),

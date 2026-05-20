@@ -21,4 +21,25 @@ class SecureStorage {
       _storage.read(key: _keyRefreshToken);
 
   static Future<void> clearAll() => _storage.deleteAll();
+
+  // Remember-me credentials
+  static const _keySavedCredential = 'saved_credential';
+  static const _keySavedPassword   = 'saved_password';
+
+  static Future<void> saveRememberMe(String credential, String password) async {
+    await _storage.write(key: _keySavedCredential, value: credential);
+    await _storage.write(key: _keySavedPassword, value: password);
+  }
+
+  static Future<({String credential, String password})?> getRememberMe() async {
+    final credential = await _storage.read(key: _keySavedCredential);
+    final password   = await _storage.read(key: _keySavedPassword);
+    if (credential == null || password == null) return null;
+    return (credential: credential, password: password);
+  }
+
+  static Future<void> clearRememberMe() async {
+    await _storage.delete(key: _keySavedCredential);
+    await _storage.delete(key: _keySavedPassword);
+  }
 }

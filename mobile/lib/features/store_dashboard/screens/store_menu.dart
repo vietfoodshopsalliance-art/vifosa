@@ -1,5 +1,6 @@
 // lib/features/store_dashboard/screens/store_menu.dart
 import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -110,8 +111,7 @@ class StoreMenuNotifier extends StateNotifier<StoreMenuState> {
   Future<void> _load() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final res = await DioClient()
-          .dio
+      final res = await DioClient.instance
           .get(ApiEndpoints.storeMenu(storeId));
       final data = res.data as Map<String, dynamic>;
       final cats = (data['categories'] as List? ?? [])
@@ -127,8 +127,8 @@ class StoreMenuNotifier extends StateNotifier<StoreMenuState> {
 
   Future<void> toggleItemAvailability(String itemId, bool current) async {
     try {
-      await DioClient().dio.patch(
-        '${ApiEndpoints.items(storeId)}/$itemId',
+      await DioClient.instance.patch(
+        '${ApiEndpoints.storeItems(storeId)}/$itemId',
         data: {'isAvailable': !current},
       );
       await _load();
@@ -137,18 +137,16 @@ class StoreMenuNotifier extends StateNotifier<StoreMenuState> {
 
   Future<void> deleteItem(String itemId) async {
     try {
-      await DioClient()
-          .dio
-          .delete('${ApiEndpoints.items(storeId)}/$itemId');
+      await DioClient.instance
+          .delete('${ApiEndpoints.storeItems(storeId)}/$itemId');
       await _load();
     } catch (_) {}
   }
 
   Future<void> deleteCategory(String categoryId) async {
     try {
-      await DioClient()
-          .dio
-          .delete('${ApiEndpoints.categories(storeId)}/$categoryId');
+      await DioClient.instance
+          .delete('${ApiEndpoints.storeCategories(storeId)}/$categoryId');
       await _load();
     } catch (_) {}
   }
@@ -585,13 +583,13 @@ class _CategoryDialogState extends State<_CategoryDialog> {
     setState(() => _saving = true);
     try {
       if (widget.existing != null) {
-        await DioClient().dio.patch(
-          '${ApiEndpoints.categories(widget.storeId)}/${widget.existing!.id}',
+        await DioClient.instance.patch(
+          '${ApiEndpoints.storeCategories(widget.storeId)}/${widget.existing!.id}',
           data: {'name': _nameCtrl.text.trim()},
         );
       } else {
-        await DioClient().dio.post(
-          ApiEndpoints.categories(widget.storeId),
+        await DioClient.instance.post(
+          ApiEndpoints.storeCategories(widget.storeId),
           data: {'name': _nameCtrl.text.trim()},
         );
       }
@@ -656,7 +654,7 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
   final _priceCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   String? _selectedCategoryId;
-  File? _imageFile;
+  XFile? _imageFile;
   String? _existingImageUrl;
   bool _saving = false;
 
@@ -685,7 +683,7 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
   }
 
   Future<void> _pickImage() async {
-    final file = await ImageService.pickAndCompress();
+    final file = await ImageService.instance.pickSingle();
     if (file == null) return;
     setState(() => _imageFile = file);
   }
@@ -696,7 +694,11 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
     try {
       String? imageUrl = _existingImageUrl;
       if (_imageFile != null) {
-        imageUrl = await ImageService.upload(_imageFile!);
+        final uploaded = await ImageService.instance.uploadXFile(
+          _imageFile!,
+          context: ImageUploadContext.menuItem,
+        );
+        imageUrl = uploaded.url;
       }
 
       final data = {
@@ -708,14 +710,13 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
       };
 
       if (widget.existing != null) {
-        await DioClient().dio.patch(
-          '${ApiEndpoints.items(widget.storeId)}/${widget.existing!.id}',
+        await DioClient.instance.patch(
+          '${ApiEndpoints.storeItems(widget.storeId)}/${widget.existing!.id}',
           data: data,
         );
       } else {
-        await DioClient()
-            .dio
-            .post(ApiEndpoints.items(widget.storeId), data: data);
+        await DioClient.instance
+            .post(ApiEndpoints.storeItems(widget.storeId), data: data);
       }
       widget.onSaved();
     } catch (_) {
@@ -756,7 +757,7 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
                 child: _imageFile != null
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(10),
-                        child: Image.file(_imageFile!, fit: BoxFit.cover),
+                        child: Image.file(File(_imageFile!.path), fit: BoxFit.cover),
                       )
                     : _existingImageUrl != null
                         ? ClipRRect(

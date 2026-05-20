@@ -15,7 +15,7 @@ final storeReviewsProvider =
     FutureProvider.family.autoDispose<List<dynamic>, String>(
   (ref, storeId) async {
     final dio = ref.read(dioClientProvider);
-    final res = await dio.get(ApiEndpoints.storeReviews(storeId));
+    final res = await dio.dio.get(ApiEndpoints.storeReviews(storeId));
     return res.data as List<dynamic>;
   },
 );
@@ -351,13 +351,13 @@ class _ReviewCard extends ConsumerWidget {
         onSave: (text) async {
           final dio = ref.read(dioClientProvider);
           if (isEdit) {
-            await dio.put(
-              ApiEndpoints.storeReviewReply(storeId, reviewId),
+            await dio.dio.put(
+              ApiEndpoints.reviewReply(reviewId),
               data: {'reply': text},
             );
           } else {
-            await dio.post(
-              ApiEndpoints.storeReviewReply(storeId, reviewId),
+            await dio.dio.post(
+              ApiEndpoints.reviewReply(reviewId),
               data: {'reply': text},
             );
           }

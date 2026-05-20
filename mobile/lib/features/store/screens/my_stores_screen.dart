@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/store_providers.dart';
 import '../models/store_model.dart';
-import '../../store_dashboard/screens/store_dashboard_screen.dart';
-import '../../store_dashboard/create_store/create_store_screen.dart';
+import 'store_dashboard_screen.dart';
+import 'create_store_screen.dart';
 
 class MyStoresScreen extends ConsumerWidget {
   const MyStoresScreen({super.key});
@@ -69,10 +69,6 @@ class MyStoresScreen extends ConsumerWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Card quán
-// ---------------------------------------------------------------------------
-
 class _StoreCard extends StatelessWidget {
   const _StoreCard({required this.store});
   final StoreModel store;
@@ -88,7 +84,7 @@ class _StoreCard extends StatelessWidget {
         children: [
           const SizedBox(height: 2),
           Text(
-            store.address.text,
+            store.addressText,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 12, color: Colors.grey),
@@ -112,10 +108,11 @@ class _StoreAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (store.avatarUrl != null) {
+    final avatar = store.avatarImage;
+    if (avatar.isNotEmpty) {
       return CircleAvatar(
         radius: 28,
-        backgroundImage: NetworkImage(store.avatarUrl!),
+        backgroundImage: NetworkImage(avatar),
       );
     }
     return CircleAvatar(
@@ -128,11 +125,6 @@ class _StoreAvatar extends StatelessWidget {
     );
   }
 }
-
-// ---------------------------------------------------------------------------
-// Badge trạng thái quán (theo spec mục 0.8)
-// A. Đang mở  B. Ngoài giờ  C. Đóng khẩn cấp  D. Admin khoá
-// ---------------------------------------------------------------------------
 
 class _StatusBadge extends StatelessWidget {
   const _StatusBadge({required this.store});
@@ -152,16 +144,12 @@ class _StatusBadge extends StatelessWidget {
   }
 
   (String, Color) _resolve() {
-    if (store.isLockedByAdmin) return ('Admin khoá', Colors.red);
+    if (store.isAdLockedByAdmin) return ('Admin khoá', Colors.red);
     if (store.emergencyClosed) return ('Đóng khẩn cấp', Colors.red);
-    if (store.isOpen) return ('Đang mở', Colors.green);
+    if (store.status == StoreStatus.open) return ('Đang mở', Colors.green);
     return ('Ngoài giờ', Colors.grey);
   }
 }
-
-// ---------------------------------------------------------------------------
-// Empty state
-// ---------------------------------------------------------------------------
 
 class _EmptyStores extends StatelessWidget {
   const _EmptyStores({required this.onCreateTap});

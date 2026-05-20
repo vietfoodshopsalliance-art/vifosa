@@ -12,7 +12,7 @@ import '../../../core/widgets/app_button.dart';
 final _vnd = NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
 
 final orderDetailProvider = FutureProvider.autoDispose.family<Map<String, dynamic>, String>((ref, id) async {
-  final res = await DioClient().dio.get(ApiEndpoints.orderDetail(id));
+  final res = await DioClient.instance.get(ApiEndpoints.orderDetail(id));
   return Map<String, dynamic>.from(res.data['order'] ?? res.data);
 });
 
@@ -64,7 +64,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
   Future<void> _confirmPayment() async {
     setState(() => _loadingAction = true);
     try {
-      await DioClient().dio.post(ApiEndpoints.confirmPayment(widget.orderId));
+      await DioClient.instance.post(ApiEndpoints.orderReportPaid(widget.orderId));
       ref.invalidate(orderDetailProvider(widget.orderId));
     } catch (_) {
       if (mounted) {
@@ -92,7 +92,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
     if (confirm != true) return;
     setState(() => _loadingAction = true);
     try {
-      await DioClient().dio.post(ApiEndpoints.confirmReceived(widget.orderId));
+      await DioClient.instance.post(ApiEndpoints.orderConfirmReceived(widget.orderId));
       ref.invalidate(orderDetailProvider(widget.orderId));
     } catch (_) {
     } finally {
@@ -118,7 +118,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
     if (confirm != true) return;
     setState(() => _loadingAction = true);
     try {
-      await DioClient().dio.post(ApiEndpoints.cancelOrder(widget.orderId));
+      await DioClient.instance.post(ApiEndpoints.orderCancel(widget.orderId));
       ref.invalidate(orderDetailProvider(widget.orderId));
     } catch (_) {
     } finally {
@@ -446,7 +446,7 @@ class _ReviewTabState extends ConsumerState<_ReviewTab> {
   Future<void> _submitReview() async {
     setState(() => _loading = true);
     try {
-      await DioClient().dio.post(
+      await DioClient.instance.post(
         ApiEndpoints.orderReview(widget.orderId),
         data: {'rating': _rating, 'comment': _commentCtrl.text.trim()},
       );

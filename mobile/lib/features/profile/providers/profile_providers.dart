@@ -54,7 +54,46 @@ final addressNotifierProvider =
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/dio_client.dart';
 import '../repositories/profile_repository.dart';
+import '../models/address_model.dart';
 
 final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
-  return ProfileRepository(DioClient().dio);
+  return ProfileRepository(DioClient.instance);
+});
+
+class AddressNotifier extends StateNotifier<AsyncValue<List<AddressModel>>> {
+  final ProfileRepository _repo;
+
+  AddressNotifier(this._repo) : super(const AsyncValue.loading()) {
+    load();
+  }
+
+  Future<void> load() async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() => _repo.getAddresses());
+  }
+
+  Future<void> add(Map<String, dynamic> data) async {
+    await _repo.addAddress(data);
+    await load();
+  }
+
+  Future<void> update(String id, Map<String, dynamic> data) async {
+    await _repo.updateAddress(id, data);
+    await load();
+  }
+
+  Future<void> delete(String id) async {
+    await _repo.deleteAddress(id);
+    await load();
+  }
+
+  Future<void> setDefault(String id) async {
+    await _repo.setDefaultAddress(id);
+    await load();
+  }
+}
+
+final addressNotifierProvider =
+    StateNotifierProvider<AddressNotifier, AsyncValue<List<AddressModel>>>((ref) {
+  return AddressNotifier(ref.read(profileRepositoryProvider));
 });

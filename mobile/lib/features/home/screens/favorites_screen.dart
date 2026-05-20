@@ -2,13 +2,17 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/widgets/store_card.dart';
+import '../../../core/models/store.dart';
 
 final favoritesProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  final res = await DioClient().dio.get(ApiEndpoints.favorites);
-  return List<Map<String, dynamic>>.from(res.data['stores'] ?? res.data);
+  final res = await DioClient.instance.get(ApiEndpoints.favorites);
+  final data = res.data is Map ? (res.data['data'] ?? res.data) : res.data;
+  final list = data is Map ? (data['stores'] ?? data['items'] ?? []) : data;
+  return List<Map<String, dynamic>>.from(list as List);
 });
 
 class FavoritesScreen extends ConsumerWidget {
@@ -42,12 +46,8 @@ class FavoritesScreen extends ConsumerWidget {
                   itemBuilder: (_, i) {
                     final s = stores[i];
                     return StoreCard(
-                      storeId: s['_id'] ?? '',
-                      name: s['name'] ?? '',
-                      coverUrl: s['coverImage'] ?? '',
-                      rating: (s['averageRating'] ?? 0).toDouble(),
-                      distanceKm: (s['distanceKm'] ?? 0).toDouble(),
-                      status: s['status'] ?? 'closed',
+                      store: Store.fromJson(s),
+                      onTap: () => context.push('/store/${s['_id'] ?? s['id'] ?? ''}'),
                     );
                   },
                 ),

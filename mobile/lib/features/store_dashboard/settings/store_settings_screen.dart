@@ -7,27 +7,28 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
-import '../../../core/services/image_service.dart' show ImageService, ImageUploadContext, imageServiceProvider;
+import '../../../core/services/image_service.dart' show ImageUploadContext, imageServiceProvider;
 import 'open_hours_editor.dart';
 
 // ─── Vietnamese banks list ────────────────────────────────────────────────────
 
 const _banks = [
-  'Vietcombank',
-  'Techcombank',
-  'BIDV',
-  'VietinBank',
-  'MB Bank',
   'ACB',
-  'TPBank',
-  'VPBank',
-  'Sacombank',
-  'SHB',
   'Agribank',
-  'OCB',
+  'BIDV',
   'HDBank',
-  'SeABank',
+  'MB Bank',
   'MSB',
+  'OCB',
+  'Sacombank',
+  'SeABank',
+  'SHB',
+  'Techcombank',
+  'TPBank',
+  'VIB',
+  'VietinBank',
+  'Vietcombank',
+  'VPBank',
 ];
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -197,42 +198,41 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
       }
 
       final dio = ref.read(dioClientProvider);
-      debugPrint('=== SAVE avatarUrl=$avatarUrl coverUrl=$coverUrl');
 
-      final response = await dio.dio.patch(
-        ApiEndpoints.storeSettings(widget.storeId),
+      await dio.dio.patch(
+        ApiEndpoints.myStoreById(widget.storeId),
         data: {
           'name': _nameCtrl.text.trim(),
           'description': _descCtrl.text.trim(),
+          'phone': _phoneCtrl.text.trim(),
           'address': {
-      'text': _addressCtrl.text.trim(),
-      if (_lat != null && _lng != null)
-        'location': {'type': 'Point', 'coordinates': [_lng, _lat]},
-    },
-    if (avatarUrl != null) 'avatarUrl': avatarUrl,
-    if (coverUrl != null) 'coverUrl': coverUrl,
-    'openingHours': _openHours.entries.map((e) => e.value.toJson()).toList(),
-    'paymentMethods': {
-      'bankTransfer': _pmBankTransfer,
-      'cod': _pmCod,
-      'fiftyFifty': _pmFiftyFifty,
-    },
-    'bankAccount': {
-      'bank': _selectedBank,
-      'number': _bankNoCtrl.text.trim(),
-      'holder': _bankNameCtrl.text.trim(),
-    },
-    'shipFeeFormula': {
-      'a': int.tryParse(_shipACtrl.text) ?? 12000,
-      'b': int.tryParse(_shipBCtrl.text) ?? 5000,
-      'c': int.tryParse(_shipCCtrl.text) ?? 0,
-    },
-    'autoCancelMinutes': int.tryParse(_autoCancelCtrl.text) ?? 15,
-    'autoConfirmMinutes': int.tryParse(_autoConfirmCtrl.text) ?? 0,
-  },
-
+            'text': _addressCtrl.text.trim(),
+            if (_lat != null && _lng != null)
+              'location': {'type': 'Point', 'coordinates': [_lng, _lat]},
+          },
+          if (avatarUrl != null) 'avatarImage': avatarUrl,
+          if (coverUrl != null) 'coverImage': coverUrl,
+          'openingHours':
+              _openHours.entries.map((e) => e.value.toJson()).toList(),
+          'paymentMethods': {
+            'bankTransfer': _pmBankTransfer,
+            'cod': _pmCod,
+            'fiftyFifty': _pmFiftyFifty,
+          },
+          'bankAccount': {
+            'bank': _selectedBank,
+            'number': _bankNoCtrl.text.trim(),
+            'holder': _bankNameCtrl.text.trim(),
+          },
+          'shipFeeFormula': {
+            'a': int.tryParse(_shipACtrl.text) ?? 12000,
+            'b': int.tryParse(_shipBCtrl.text) ?? 5000,
+            'c': int.tryParse(_shipCCtrl.text) ?? 0,
+          },
+          'autoCancelMinutes': int.tryParse(_autoCancelCtrl.text) ?? 15,
+          'autoConfirmMinutes': int.tryParse(_autoConfirmCtrl.text) ?? 0,
+        },
       );
-debugPrint('=== PATCH response: ${response.data}');
 
 
       if (mounted) {
@@ -275,7 +275,7 @@ debugPrint('=== PATCH response: ${response.data}');
     try {
       final dio = ref.read(dioClientProvider);
       await dio.dio.put(
-        ApiEndpoints.storeEmergencyClose(widget.storeId),
+        ApiEndpoints.storeSettingsEmergencyClose(widget.storeId),
         data: {'emergencyClosed': value},
       );
       setState(() => _emergencyClosed = value);
@@ -498,7 +498,7 @@ debugPrint('=== PATCH response: ${response.data}');
             const _SectionHeader('Tài khoản ngân hàng quán'),
             
               DropdownButtonFormField<String>(
-              value: _selectedBank,
+              initialValue: _selectedBank,
               decoration: const InputDecoration(
                   labelText: 'Ngân hàng *',
                   border: OutlineInputBorder()),

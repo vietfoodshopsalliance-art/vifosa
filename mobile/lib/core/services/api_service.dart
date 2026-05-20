@@ -60,7 +60,7 @@ class ApiResponse<T> {
 
 class ApiService {
   ApiService({required this.tokenService})
-      : _baseUrl = apiBaseUrl,
+      : _baseUrl = Env.apiBaseUrl,
         _client = http.Client();
 
   final String _baseUrl;
@@ -84,7 +84,7 @@ class ApiService {
       HttpHeaders.acceptHeader: 'application/json',
     };
     if (auth) {
-      final token = await tokenService.getValidAccessToken();
+      final token = await tokenService.getAccessToken();
       if (token != null) {
         headers[HttpHeaders.authorizationHeader] = 'Bearer $token';
       }
@@ -108,10 +108,14 @@ class ApiService {
       return body;
     }
 
+    // Spec v3.1: lỗi được bọc trong body['error']['code'] và body['error']['message']
+    final errorObj = body['error'] as Map<String, dynamic>?;
     throw ApiException(
       statusCode: response.statusCode,
-      message: (body['message'] as String?) ?? 'Lỗi không xác định.',
-      code: body['code'] as String?,
+      message: (errorObj?['message'] as String?) ??
+          (body['message'] as String?) ??
+          'Lỗi không xác định.',
+      code: (errorObj?['code'] as String?) ?? (body['code'] as String?),
     );
   }
 
@@ -194,6 +198,22 @@ class ApiService {
     );
   }
 
+  // DELETE với body (dùng cho /me/fcm-token theo spec v3.1)
+  Future<Map<String, dynamic>> deleteWithBody(
+    String path,
+    Map<String, dynamic> body, {
+    bool auth = true,
+  }) async {
+    return _safeCall(() async {
+      final request = http.Request('DELETE', _uri(path));
+      final headers = await _headers(auth: auth);
+      request.headers.addAll(headers);
+      request.body = jsonEncode(body);
+      final streamed = await _client.send(request);
+      return http.Response.fromStream(streamed);
+    });
+  }
+
   // Multipart upload (ảnh Cloudinary qua backend nếu cần proxy)
   Future<Map<String, dynamic>> upload(
     String path,
@@ -240,40 +260,40 @@ class ApiService {
 
   // ── User endpoints ────────────────────────────────────────────────────────
 
-  /// GET /users/me
-  Future<Map<String, dynamic>> getMe() => get('/users/me');
+  /// GET /me
+  Future<Map<String, dynamic>> getMe() => get('/me');
 
-  /// PATCH /users/me
+  /// PUT /me
   Future<Map<String, dynamic>> updateMe(Map<String, dynamic> body) =>
-      patch('/users/me', body);
+      put('/me', body);
 
-  /// PATCH /users/me/password
+  /// POST /auth/change-password
   Future<Map<String, dynamic>> changePassword(Map<String, dynamic> body) =>
-      patch('/users/me/password', body);
+      post('/auth/change-password', body);
 
-  /// GET /users/:id (public profile)
-  Future<Map<String, dynamic>> getUserProfile(String userId) =>
-      get('/users/$userId');
+  /// GET /users/:username (public profile)
+  Future<Map<String, dynamic>> getUserProfile(String username) =>
+      get('/users/$username', auth: false);
 
   // ── Địa chỉ ───────────────────────────────────────────────────────────────
 
-  /// GET /addresses
-  Future<Map<String, dynamic>> getAddresses() => get('/addresses');
+  /// GET /me/addresses
+  Future<Map<String, dynamic>> getAddresses() => get('/me/addresses');
 
-  /// POST /addresses
+  /// POST /me/addresses
   Future<Map<String, dynamic>> createAddress(Map<String, dynamic> body) =>
-      post('/addresses', body);
+      post('/me/addresses', body);
 
-  /// PATCH /addresses/:id
+  /// PUT /me/addresses/:id
   Future<Map<String, dynamic>> updateAddress(
     String id,
     Map<String, dynamic> body,
   ) =>
-      patch('/addresses/$id', body);
+      put('/me/addresses/$id', body);
 
-  /// DELETE /addresses/:id
+  /// DELETE /me/addresses/:id
   Future<Map<String, dynamic>> deleteAddress(String id) =>
-      delete('/addresses/$id');
+      delete('/me/addresses/$id');
 
   // ── Store endpoints ───────────────────────────────────────────────────────
 
@@ -302,27 +322,27 @@ class ApiService {
   Future<Map<String, dynamic>> getMenu(String storeId) =>
       get('/stores/$storeId/menu');
 
-  /// POST /stores/:storeId/menu/items
+  /// POST /stores/:storeId/items
   Future<Map<String, dynamic>> createMenuItem(
     String storeId,
     Map<String, dynamic> body,
   ) =>
-      post('/stores/$storeId/menu/items', body);
+      post('/stores/$storeId/items', body);
 
-  /// PATCH /stores/:storeId/menu/items/:itemId
+  /// PATCH /stores/:storeId/items/:itemId
   Future<Map<String, dynamic>> updateMenuItem(
     String storeId,
     String itemId,
     Map<String, dynamic> body,
   ) =>
-      patch('/stores/$storeId/menu/items/$itemId', body);
+      patch('/stores/$storeId/items/$itemId', body);
 
-  /// DELETE /stores/:storeId/menu/items/:itemId
+  /// DELETE /stores/:storeId/items/:itemId
   Future<Map<String, dynamic>> deleteMenuItem(
     String storeId,
     String itemId,
   ) =>
-      delete('/stores/$storeId/menu/items/$itemId');
+      delete('/stores/$storeId/items/$itemId');
 
   // ── Order endpoints ───────────────────────────────────────────────────────
 
@@ -334,24 +354,17 @@ class ApiService {
   Future<Map<String, dynamic>> getOrder(String orderId) =>
       get('/orders/$orderId');
 
-  /// GET /orders  — query: status, page, limit
+  /// GET /me/orders  — query: status, cursor, limit
   Future<Map<String, dynamic>> getMyOrders([Map<String, dynamic>? query]) =>
-      get('/orders', queryParams: query);
+      get('/me/orders', queryParams: query);
 
-  /// GET /orders/track/:code?t=:token  — guest tracking (no auth)
-  Future<Map<String, dynamic>> trackOrder(String code, String token) =>
-      get('/orders/track/$code', queryParams: {'t': token}, auth: false);
+  /// GET /orders/track?code=:code&phone=:phone  — guest tracking (no auth)
+  Future<Map<String, dynamic>> trackOrder(String code, String phone) =>
+      get('/orders/track', queryParams: {'code': code, 'phone': phone}, auth: false);
 
-  /// PATCH /orders/:id/status
-  Future<Map<String, dynamic>> updateOrderStatus(
-    String orderId,
-    Map<String, dynamic> body,
-  ) =>
-      patch('/orders/$orderId/status', body);
-
-  /// POST /orders/:id/reported-paid  — khách báo đã chuyển khoản
+  /// POST /orders/:id/report-paid  — khách báo đã chuyển khoản
   Future<Map<String, dynamic>> reportPaid(String orderId) =>
-      post('/orders/$orderId/reported-paid', {});
+      post('/orders/$orderId/report-paid', {});
 
   /// POST /orders/:id/cancel
   Future<Map<String, dynamic>> cancelOrder(
@@ -369,24 +382,23 @@ class ApiService {
   ]) =>
       get('/stores/$storeId/orders', queryParams: query);
 
-  /// PATCH /stores/:storeId/orders/:orderId/accept
-  Future<Map<String, dynamic>> acceptOrder(String storeId, String orderId) =>
-      patch('/stores/$storeId/orders/$orderId/accept', {});
+  /// POST /orders/:orderId/accept
+  Future<Map<String, dynamic>> acceptOrder(String orderId) =>
+      post('/orders/$orderId/accept', {});
 
-  /// PATCH /stores/:storeId/orders/:orderId/reject
+  /// POST /orders/:orderId/reject
   Future<Map<String, dynamic>> rejectOrder(
-    String storeId,
     String orderId,
     Map<String, dynamic> body,
   ) =>
-      patch('/stores/$storeId/orders/$orderId/reject', body);
+      post('/orders/$orderId/reject', body);
 
-  /// PATCH /stores/:storeId/orders/:orderId/confirm-payment
+  /// POST /orders/:orderId/confirm-money-received
   Future<Map<String, dynamic>> confirmPayment(
-    String storeId,
     String orderId,
+    Map<String, dynamic> body,
   ) =>
-      patch('/stores/$storeId/orders/$orderId/confirm-payment', {});
+      post('/orders/$orderId/confirm-money-received', body);
 
   // ── Reviews ───────────────────────────────────────────────────────────────
 
@@ -434,9 +446,9 @@ class ApiService {
   Future<Map<String, dynamic>> like(Map<String, dynamic> body) =>
       post('/likes', body);
 
-  /// DELETE /likes  — body: {targetType, targetId}
+  /// POST /likes  — toggle unlike (same endpoint, liked: false khi unlike)
   Future<Map<String, dynamic>> unlike(Map<String, dynamic> body) =>
-      post('/likes/remove', body); // DELETE với body dùng POST wrapper
+      post('/likes', body);
 
   /// GET /posts/:postId/comments
   Future<Map<String, dynamic>> getComments(
@@ -461,27 +473,27 @@ class ApiService {
 
   // ── Notifications ─────────────────────────────────────────────────────────
 
-  /// GET /notifications?page=&limit=
+  /// GET /me/notifications?cursor=&limit=
   Future<Map<String, dynamic>> getNotifications([
     Map<String, dynamic>? query,
   ]) =>
-      get('/notifications', queryParams: query);
+      get('/me/notifications', queryParams: query);
 
-  /// PATCH /notifications/:id/read
+  /// PATCH /me/notifications/:id/read
   Future<Map<String, dynamic>> markNotificationRead(String id) =>
-      patch('/notifications/$id/read', {});
+      patch('/me/notifications/$id/read', {});
 
-  /// PATCH /notifications/read-all
+  /// PATCH /me/notifications/read-all
   Future<Map<String, dynamic>> markAllNotificationsRead() =>
-      patch('/notifications/read-all', {});
+      patch('/me/notifications/read-all', {});
 
-  /// POST /users/me/fcm-token
+  /// POST /me/fcm-token
   Future<Map<String, dynamic>> registerFcmToken(String token) =>
-      post('/users/me/fcm-token', {'token': token});
+      post('/me/fcm-token', {'fcmToken': token});
 
-  /// DELETE /users/me/fcm-token
+  /// DELETE /me/fcm-token
   Future<Map<String, dynamic>> removeFcmToken(String token) =>
-      post('/users/me/fcm-token/remove', {'token': token});
+      deleteWithBody('/me/fcm-token', {'fcmToken': token});
 
   // ── Reports ───────────────────────────────────────────────────────────────
 
@@ -491,17 +503,17 @@ class ApiService {
 
   // ── Support tickets ───────────────────────────────────────────────────────
 
-  /// POST /support-tickets
+  /// POST /support/tickets
   Future<Map<String, dynamic>> createSupportTicket(
     Map<String, dynamic> body,
   ) =>
-      post('/support-tickets', body);
+      post('/support/tickets', body, auth: false);
 
-  /// GET /support-tickets  — xem ticket của mình
+  /// GET /me/support/tickets
   Future<Map<String, dynamic>> getMySupportTickets([
     Map<String, dynamic>? query,
   ]) =>
-      get('/support-tickets', queryParams: query);
+      get('/me/support/tickets', queryParams: query);
 
   // ── Settings (public read) ────────────────────────────────────────────────
 
