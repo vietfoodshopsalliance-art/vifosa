@@ -96,6 +96,7 @@ class ApiEndpoints {
   static String orderReview(String id)           => '/orders/$id/review';
   static String orderReviews(String id)          => '/orders/$id/reviews';
   static String orderPaymentUpload(String id)    => '/orders/$id/payment/upload-receipt';
+  static String orderFoodPhotos(String id)       => '/orders/$id/food-photos';
   static String orderRefundBankInfo(String id)   => '/orders/$id/refund/bank-info';
   static String orderRefundSubmit(String id)     => '/orders/$id/refund/submit';
   static String orderRefundConfirm(String id)    => '/orders/$id/refund/confirm';

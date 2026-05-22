@@ -22,6 +22,12 @@ class SecureStorage {
 
   static Future<void> clearAll() => _storage.deleteAll();
 
+  // Chỉ xóa tokens — giữ nguyên remember-me credentials
+  static Future<void> clearTokens() async {
+    await _storage.delete(key: _keyAccessToken);
+    await _storage.delete(key: _keyRefreshToken);
+  }
+
   // Remember-me credentials
   static const _keySavedCredential = 'saved_credential';
   static const _keySavedPassword   = 'saved_password';

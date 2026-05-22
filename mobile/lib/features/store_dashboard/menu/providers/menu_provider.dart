@@ -253,7 +253,7 @@ class MenuNotifier extends StateNotifier<MenuState> {
     _api
         .patch('/stores/$storeId/categories/reorder',
             body: {'categories': reorderPayload})
-        .catchError((_) => fetchMenu()); // rollback on fail
+        .then<void>((_) {}, onError: (_) => fetchMenu()); // rollback on fail
   }
 
   // ── Items ────────────────────────────────────────────────────────────────────

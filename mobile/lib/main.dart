@@ -1,23 +1,45 @@
 // lib/main.dart
 
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/providers/auth_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
 
-  final container = ProviderContainer();
-  container.read(authProvider);     // bắt đầu _init() kiểm tra token
-  container.read(appRouterProvider); // gắn listener vào authProvider ngay
+  // Bắt tất cả lỗi Flutter framework
+  FlutterError.onError = (details) {
+    debugPrint('══ FlutterError ══');
+    debugPrint('${details.exceptionAsString()}');
+    debugPrint('${details.stack}');
+  };
 
-  runApp(
-    UncontrolledProviderScope(
-      container: container,
-      child: const VifosaApp(),
-    ),
+  runZonedGuarded(
+    () async {
+      final container = ProviderContainer();
+      container.read(authProvider);
+      container.read(appRouterProvider);
+
+      runApp(
+        UncontrolledProviderScope(
+          container: container,
+          child: const VifosaApp(),
+        ),
+      );
+    },
+    // Bắt mọi lỗi async không được xử lý
+    (error, stack) {
+      debugPrint('══ UNHANDLED ASYNC ERROR ══');
+      debugPrint('Type : ${error.runtimeType}');
+      debugPrint('Error: $error');
+      debugPrint('Stack:\n$stack');
+    },
   );
 }
 

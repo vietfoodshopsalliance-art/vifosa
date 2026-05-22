@@ -40,11 +40,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final radius = ref.watch(selectedRadiusProvider);
-    final isAuth = ref.watch(authProvider).isAuthenticated;
-    final user = ref.watch(authProvider).user;
-    final roles = (user?['roles'] as List<dynamic>?)?.cast<String>() ?? [];
-
+    final radius    = ref.watch(selectedRadiusProvider);
+    final authState = ref.watch(authProvider);
+    final isAuth    = authState.isAuthenticated;
+    final user      = authState.user;
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       body: RefreshIndicator(
@@ -60,9 +59,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               backgroundColor: Colors.white,
               elevation: 1,
               titleSpacing: 16,
-              title: const Row(
+              // Issue 6: Search button nằm bên phải logo Vifosa
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.restaurant_menu,
+                  const Icon(Icons.restaurant_menu,
                       color: Color(0xFFE53935), size: 22),
                   const SizedBox(width: 6),
                   const Text(
@@ -73,27 +74,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       fontSize: 20,
                     ),
                   ),
+                  const SizedBox(width: 10),
+                  // Issue 3 & 6: Search button trái
+                  GestureDetector(
+                    onTap: () => context.go('/search'),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0F0F0),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Icon(Icons.search,
+                          color: Colors.black54, size: 18),
+                    ),
+                  ),
                 ],
               ),
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.search, color: Colors.black87),
-                  tooltip: 'Tìm kiếm',
-                  onPressed: () => context.go('/search'),
-                ),
                 IconButton(
                   icon: const Icon(Icons.notifications_outlined,
                       color: Colors.black87),
                   tooltip: 'Thông báo',
                   onPressed: () => context.push('/notifications'),
                 ),
-                if (roles.length > 1) _RoleMenuButton(user: user, roles: roles),
+                // Issue 4 & 5: Avatar cho tất cả user đã đăng nhập
+                if (isAuth) _AvatarMenuButton(user: user),
                 const SizedBox(width: 4),
               ],
             ),
 
-            // ── Radius selector ───────────────────────────────────────
-            SliverToBoxAdapter(child: _RadiusSelector(radius: radius)),
+            // Issue 7: Ẩn radius selector — auto-expand trong NearbyNotifier
 
             // ── Section 1: Quán mới ───────────────────────────────────
             _SectionSliver(
@@ -121,7 +131,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 provider: favoriteStoresProvider,
               ),
 
-            // ── Section 6: Quán gần bạn (infinite scroll) ────────────
+            // ── Section 6: Quán gần bạn (infinite scroll, auto-radius) ──
             _NearbySection(),
 
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
@@ -132,61 +142,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _onRefresh() async {
-    final radius = ref.read(selectedRadiusProvider);
-    ref.invalidate(homeFeedDataProvider(radius));
     await ref.read(nearbyStoresProvider.notifier).refresh();
-  }
-}
-
-// ── Radius selector ───────────────────────────────────────────────────────────
-
-class _RadiusSelector extends ConsumerWidget {
-  final int radius;
-  const _RadiusSelector({required this.radius});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-      child: Row(
-        children: [
-          const Icon(Icons.place_outlined, size: 16, color: Color(0xFF888888)),
-          const SizedBox(width: 4),
-          const Text('Bán kính:',
-              style: TextStyle(fontSize: 13, color: Color(0xFF888888))),
-          const SizedBox(width: 8),
-          ...[5, 10, 25].map(
-            (r) => Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: Text('${r}km'),
-                selected: radius == r,
-                onSelected: (_) =>
-                    ref.read(selectedRadiusProvider.notifier).state = r,
-                selectedColor: const Color(0xFFE53935),
-                labelStyle: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: radius == r ? Colors.white : const Color(0xFF555555),
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(
-                    color: radius == r
-                        ? const Color(0xFFE53935)
-                        : const Color(0xFFDDDDDD),
-                  ),
-                ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -293,11 +249,9 @@ class _NearbySection extends ConsumerWidget {
               Icon(Icons.store_mall_directory_outlined,
                   size: 64, color: Colors.black26),
               SizedBox(height: 12),
-              Text('Không có quán nào trong khu vực này.',
-                  style: TextStyle(color: Colors.black45)),
-              SizedBox(height: 4),
-              Text('Thử mở rộng bán kính tìm kiếm.',
-                  style: TextStyle(fontSize: 12, color: Colors.black38)),
+              Text('Chưa có quán nào trong khu vực của bạn.',
+                  style: TextStyle(color: Colors.black45),
+                  textAlign: TextAlign.center),
             ],
           ),
         ),
@@ -348,52 +302,40 @@ class _NearbySection extends ConsumerWidget {
   }
 }
 
-// ── Role menu button (AppBar) ─────────────────────────────────────────────────
+// ── Avatar menu button (AppBar) — Issues 4 & 5 ───────────────────────────────
 
-class _RoleMenuButton extends ConsumerWidget {
+class _AvatarMenuButton extends ConsumerWidget {
   final Map<String, dynamic>? user;
-  final List<String> roles;
-  const _RoleMenuButton({required this.user, required this.roles});
+  const _AvatarMenuButton({required this.user});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final nickname = user?['nickname'] as String? ??
         user?['username'] as String? ??
         '';
-    final avatarUrl = user?['avatarImage'] as String?;
+    final avatarUrl = user?['avatarImage'] as String? ?? user?['avatar'] as String?;
 
-    return PopupMenuButton<_RoleOption>(
+    return PopupMenuButton<_MenuOption>(
       offset: const Offset(0, 50),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       onSelected: (option) => _onSelected(context, ref, option),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildAvatar(avatarUrl, nickname),
-            const Icon(Icons.keyboard_arrow_down_rounded,
-                size: 16, color: Colors.black54),
-          ],
-        ),
+        child: _buildAvatar(avatarUrl, nickname),
       ),
       itemBuilder: (_) => [
-        _menuItem(_RoleOption.home, Icons.home_outlined, 'Trang chủ khách hàng'),
-        if (roles.contains('store_owner'))
-          _menuItem(_RoleOption.storeDashboard, Icons.storefront_outlined,
-              'Dashboard quán'),
-        if (roles.contains('admin'))
-          _menuItem(_RoleOption.admin, Icons.admin_panel_settings_outlined,
-              'Quản trị'),
+        _menuItem(_MenuOption.profile, Icons.person_outline, 'Profile'),
+        _menuItem(_MenuOption.storeDashboard, Icons.storefront_outlined,
+            'Quản lý quán'),
         const PopupMenuDivider(),
-        _menuItem(_RoleOption.logout, Icons.logout_rounded, 'Đăng xuất',
+        _menuItem(_MenuOption.logout, Icons.logout_rounded, 'Thoát',
             destructive: true),
       ],
     );
   }
 
-  PopupMenuItem<_RoleOption> _menuItem(
-    _RoleOption option,
+  PopupMenuItem<_MenuOption> _menuItem(
+    _MenuOption option,
     IconData icon,
     String label, {
     bool destructive = false,
@@ -423,8 +365,7 @@ class _RoleMenuButton extends ConsumerWidget {
       Color(0xFFEF4444), Color(0xFF8B5CF6),
     ];
     if (url != null && url.isNotEmpty) {
-      return CircleAvatar(
-          radius: 15, backgroundImage: NetworkImage(url));
+      return CircleAvatar(radius: 15, backgroundImage: NetworkImage(url));
     }
     final color =
         colors[(nickname.isNotEmpty ? nickname.codeUnitAt(0) : 0) % colors.length];
@@ -439,18 +380,16 @@ class _RoleMenuButton extends ConsumerWidget {
     );
   }
 
-  void _onSelected(BuildContext context, WidgetRef ref, _RoleOption option) {
+  void _onSelected(BuildContext context, WidgetRef ref, _MenuOption option) {
     switch (option) {
-      case _RoleOption.home:
-        context.go('/home');
-      case _RoleOption.storeDashboard:
+      case _MenuOption.profile:
+        context.push('/profile');
+      case _MenuOption.storeDashboard:
         context.push('/my-stores');
-      case _RoleOption.admin:
-        context.push('/admin');
-      case _RoleOption.logout:
+      case _MenuOption.logout:
         ref.read(authProvider.notifier).logout();
     }
   }
 }
 
-enum _RoleOption { home, storeDashboard, admin, logout }
+enum _MenuOption { profile, storeDashboard, logout }

@@ -28,7 +28,7 @@ class NotificationsScreen extends ConsumerWidget {
           TextButton(
             onPressed: () {
               // Mark all read
-              DioClient.instance.put('${ApiEndpoints.notifications}/read-all').catchError((_) {});
+              DioClient.instance.put('${ApiEndpoints.notifications}/read-all').then<void>((_) {}, onError: (_) {});
               ref.invalidate(notificationsProvider);
             },
             child: const Text('Đọc tất cả'),

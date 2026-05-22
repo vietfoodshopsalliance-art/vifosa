@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../core/network/api_endpoints.dart';
 import '../../../core/services/image_service.dart'
     show ImageUploadContext, imageServiceProvider;
 import '../../../core/widgets/order_code_text.dart';
@@ -36,6 +37,29 @@ class StoreOrderDetailScreen extends ConsumerStatefulWidget {
 class _StoreOrderDetailScreenState
     extends ConsumerState<StoreOrderDetailScreen> {
   bool _uploading = false;
+  late List<String> _foodPhotos;
+
+  @override
+  void initState() {
+    super.initState();
+    _foodPhotos = List<String>.from(widget.order.foodPhotos);
+    _refreshFoodPhotos();
+  }
+
+  Future<void> _refreshFoodPhotos() async {
+    try {
+      final res = await DioClient.instance
+          .get(ApiEndpoints.orderDetail(widget.order.id));
+      final data = res.data is Map ? res.data as Map<String, dynamic> : <String, dynamic>{};
+      final order = (data['order'] ?? data) as Map<String, dynamic>;
+      final photos = (order['foodPhotos'] as List<dynamic>? ?? [])
+          .map((e) => e.toString())
+          .toList();
+      if (mounted) setState(() => _foodPhotos = photos);
+    } catch (_) {
+      // giữ nguyên snapshot nếu fetch lỗi
+    }
+  }
 
   String get _deliverBtnLabel {
     if (widget.order.paymentMethod == 'cod') return 'Đã giao cho khách';
@@ -82,13 +106,14 @@ class _StoreOrderDetailScreenState
       final svc = ref.read(imageServiceProvider);
       final result = await svc.uploadFile(
         File(file.path),
-        context: ImageUploadContext.storeAvatar,
+        context: ImageUploadContext.foodPhoto,
       );
       await DioClient.instance.post(
-        '/orders/${widget.order.id}/food-photos',
-        data: {'url': result.url},
+        ApiEndpoints.orderFoodPhotos(widget.order.id),
+        data: {'photoUrl': result.url},
       );
       if (mounted) {
+        setState(() => _foodPhotos.add(result.url));
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Đã tải ảnh lên')));
       }
@@ -200,17 +225,17 @@ class _StoreOrderDetailScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (o.foodPhotos.isNotEmpty) ...[
+                if (_foodPhotos.isNotEmpty) ...[
                   SizedBox(
                     height: 100,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
-                      itemCount: o.foodPhotos.length,
+                      itemCount: _foodPhotos.length,
                       separatorBuilder: (_, __) => const SizedBox(width: 8),
                       itemBuilder: (_, i) => ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: Image.network(
-                          o.foodPhotos[i],
+                          _foodPhotos[i],
                           width: 100,
                           height: 100,
                           fit: BoxFit.cover,

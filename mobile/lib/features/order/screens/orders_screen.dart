@@ -11,8 +11,12 @@ import '../../../core/widgets/order_code_text.dart';
 final _vnd = NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
 final _dateFormat = DateFormat('dd/MM/yyyy HH:mm');
 
-final ordersListProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  final res = await DioClient.instance.get(ApiEndpoints.orders);
+final ordersListProvider =
+    FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>((ref, tab) async {
+  final res = await DioClient.instance.get(
+    ApiEndpoints.myOrders,
+    queryParameters: {'tab': tab},
+  );
   return List<Map<String, dynamic>>.from(res.data['orders'] ?? res.data);
 });
 
@@ -21,52 +25,78 @@ class OrdersScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ordersAsync = ref.watch(ordersListProvider);
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.home_outlined),
+            onPressed: () => context.go('/home'),
+          ),
+          title: const Text('Đơn hàng của tôi'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Chờ xử lý'),
+              Tab(text: 'Đang làm'),
+              Tab(text: 'Lịch sử'),
+            ],
+          ),
+        ),
+        body: const TabBarView(
+          children: [
+            _OrdersTab(tab: 'pending'),
+            _OrdersTab(tab: 'active'),
+            _OrdersTab(tab: 'history'),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-    return Scaffold(
-      appBar: AppBar(
-  leading: IconButton(
-    icon: const Icon(Icons.home_outlined),
-    onPressed: () => context.go('/home'),
-  ),
-  title: const Text('Đơn hàng của tôi'),
-),
-      body: RefreshIndicator(
-        onRefresh: () async => ref.invalidate(ordersListProvider),
-        child: ordersAsync.when(
-          data: (orders) => orders.isEmpty
-              ? ListView(
-                  children: const [
-                    SizedBox(height: 120),
-                    Center(
-                      child: Column(
-                        children: [
-                          Icon(Icons.receipt_long, size: 64, color: Colors.grey),
-                          SizedBox(height: 12),
-                          Text('Bạn chưa có đơn hàng nào', style: TextStyle(color: Colors.grey)),
-                        ],
-                      ),
+class _OrdersTab extends ConsumerWidget {
+  final String tab;
+  const _OrdersTab({required this.tab});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ordersAsync = ref.watch(ordersListProvider(tab));
+
+    return RefreshIndicator(
+      onRefresh: () async => ref.invalidate(ordersListProvider(tab)),
+      child: ordersAsync.when(
+        data: (orders) => orders.isEmpty
+            ? ListView(
+                children: const [
+                  SizedBox(height: 120),
+                  Center(
+                    child: Column(
+                      children: [
+                        Icon(Icons.receipt_long, size: 64, color: Colors.grey),
+                        SizedBox(height: 12),
+                        Text('Không có đơn hàng', style: TextStyle(color: Colors.grey)),
+                      ],
                     ),
-                  ],
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: orders.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (ctx, i) => _OrderCard(order: orders[i]),
-                ),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('Không thể tải đơn hàng'),
-                TextButton(
-                  onPressed: () => ref.invalidate(ordersListProvider),
-                  child: const Text('Thử lại'),
-                ),
-              ],
-            ),
+                  ),
+                ],
+              )
+            : ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: orders.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (ctx, i) => _OrderCard(order: orders[i]),
+              ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('Không thể tải đơn hàng'),
+              TextButton(
+                onPressed: () => ref.invalidate(ordersListProvider(tab)),
+                child: const Text('Thử lại'),
+              ),
+            ],
           ),
         ),
       ),
@@ -81,7 +111,9 @@ class _OrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final status = order['status'] ?? '';
+    final status = order['mainStatus'] as String? ?? '';
+    final storeRaw = order['storeId'];
+    final storeName = storeRaw is Map ? (storeRaw['name'] as String? ?? '') : '';
     final createdAt = order['createdAt'] != null
         ? _dateFormat.format(DateTime.parse(order['createdAt']).toLocal())
         : '';
@@ -98,16 +130,15 @@ class _OrderCard extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: OrderCodeText(code: order['orderCode'] ?? ''),
+                    child: OrderCodeText(code: order['code'] as String? ?? ''),
                   ),
                   _StatusChip(status: status),
                 ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                order['storeName'] ?? '',
-                style: const TextStyle(fontWeight: FontWeight.w500),
-              ),
+              if (storeName.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(storeName, style: const TextStyle(fontWeight: FontWeight.w500)),
+              ],
               const SizedBox(height: 4),
               Text(createdAt, style: const TextStyle(color: Colors.grey, fontSize: 12)),
               const Divider(height: 12),
@@ -139,15 +170,15 @@ class _StatusChip extends StatelessWidget {
   final String status;
   const _StatusChip({required this.status});
 
-  static const _labels = {
-    'pending': ('Chờ xác nhận', Color(0xFFFFC107)),
-    'accepted': ('Đã xác nhận', Color(0xFF2196F3)),
-    'delivering': ('Đang giao', Color(0xFF9C27B0)),
-    'delivered': ('Đã giao', Color(0xFF4CAF50)),
-    'received': ('Đã nhận', Color(0xFF4CAF50)),
-    'cancelled': ('Đã hủy', Color(0xFFF44336)),
-    'refund_requested': ('Yêu cầu hoàn tiền', Color(0xFFFF9800)),
-    'refunded': ('Đã hoàn tiền', Color(0xFF009688)),
+  static const _labels = <String, (String, Color)>{
+    'pending_store':       ('Chờ xác nhận',   Color(0xFFFFC107)),
+    'awaiting_payment':    ('Chờ thanh toán', Color(0xFFFF9800)),
+    'awaiting_store_open': ('Chờ quán mở',    Color(0xFFFFC107)),
+    'preparing':           ('Đang chuẩn bị',  Color(0xFF2196F3)),
+    'delivering':          ('Đang giao',       Color(0xFF9C27B0)),
+    'delivered':           ('Đã giao',         Color(0xFF4CAF50)),
+    'completed':           ('Đã nhận',         Color(0xFF4CAF50)),
+    'cancelled':           ('Đã hủy',          Color(0xFFF44336)),
   };
 
   @override

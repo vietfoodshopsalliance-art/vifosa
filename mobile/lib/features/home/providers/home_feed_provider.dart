@@ -88,34 +88,50 @@ class NearbyState {
 }
 
 class NearbyNotifier extends StateNotifier<NearbyState> {
+  static const _radii = [5, 10, 25];
+
   NearbyNotifier(this._ref) : super(const NearbyState()) {
-    _ref.listen<int>(selectedRadiusProvider, (_, radius) {
-      _init(radius);
-    });
-    _init(_ref.read(selectedRadiusProvider));
+    _init(5);
   }
 
   final Ref _ref;
+  int _effectiveRadius = 5; // radius thực sự có quán
 
-  Future<void> _init(int radius) async {
+  // Issue 7: Tự động mở rộng bán kính 5→10→25 khi không có quán
+  Future<void> _init(int startRadius) async {
     state = const NearbyState(isLoading: true);
-    try {
-      final data = await _ref.read(homeFeedDataProvider(radius).future);
-      state = NearbyState(
-        stores: data.nearbyStores,
-        isLoading: false,
-        hasMore: data.hasMore,
-        nextCursor: data.nextCursor,
-      );
-    } catch (e) {
-      state = NearbyState(isLoading: false, error: e.toString());
+
+    final startIdx = _radii.indexOf(startRadius).clamp(0, _radii.length - 1);
+
+    for (int i = startIdx; i < _radii.length; i++) {
+      final radius = _radii[i];
+      try {
+        final data = await _ref.read(homeFeedDataProvider(radius).future);
+        if (data.nearbyStores.isNotEmpty || i == _radii.length - 1) {
+          _effectiveRadius = radius;
+          state = NearbyState(
+            stores: data.nearbyStores,
+            isLoading: false,
+            hasMore: data.hasMore,
+            nextCursor: data.nextCursor,
+          );
+          return;
+        }
+        // nearbyStores rỗng, thử bán kính lớn hơn
+      } catch (e) {
+        state = NearbyState(isLoading: false, error: e.toString());
+        return;
+      }
     }
   }
 
   Future<void> refresh() async {
-    final radius = _ref.read(selectedRadiusProvider);
-    _ref.invalidate(homeFeedDataProvider(radius));
-    await _init(radius);
+    // Invalidate cache của tất cả các bán kính
+    for (final r in _radii) {
+      _ref.invalidate(homeFeedDataProvider(r));
+    }
+    _effectiveRadius = 5;
+    await _init(5);
   }
 
   Future<void> loadMore() async {
@@ -124,7 +140,7 @@ class NearbyNotifier extends StateNotifier<NearbyState> {
 
     state = state.copyWith(isLoadingMore: true);
     try {
-      final radius = _ref.read(selectedRadiusProvider);
+      final radius = _effectiveRadius; // dùng radius đã tìm được quán
       final loc = await _ref.read(locationProvider.future);
       final res = await _ref.read(dioClientProvider).dio.get(
         '/home-feed',

@@ -267,7 +267,7 @@ class StoreOrdersNotifier extends StateNotifier<StoreOrdersState> {
   }
 
   Future<void> acceptOrder(String orderId) async {
-    await DioClient.instance.patch(ApiEndpoints.orderAccept(orderId));
+    await DioClient.instance.patch(ApiEndpoints.orderAccept(orderId), data: {});
     await fetchOrders();
   }
 
@@ -290,24 +290,33 @@ class StoreOrdersNotifier extends StateNotifier<StoreOrdersState> {
 
     if (order == null) return;
 
-    if (order.mainStatus == 'preparing') {
-      // deliver → then immediately complete (single-tap flow)
-      await DioClient.instance.patch(ApiEndpoints.orderDeliver(orderId));
-      try {
-        await DioClient.instance.patch(ApiEndpoints.orderComplete(orderId));
-      } catch (_) {
-        // stays in delivering if complete fails (e.g., needs payment first)
-      }
-    } else {
-      await DioClient.instance.patch(ApiEndpoints.orderComplete(orderId));
+    // Chain đúng theo trạng thái hiện tại
+    if (order.isPending) {
+      await DioClient.instance.patch(ApiEndpoints.orderAccept(orderId), data: {});
+      await DioClient.instance.patch(ApiEndpoints.orderDeliver(orderId), data: {});
+    } else if (order.mainStatus == 'preparing') {
+      await DioClient.instance.patch(ApiEndpoints.orderDeliver(orderId), data: {});
     }
+    // 'delivering' → fall through to complete below (COD case)
+
+    // COD: bàn giao = giao xong + thu tiền ngay
+    if (order.paymentMethod == 'cod') {
+      await DioClient.instance.patch(ApiEndpoints.orderComplete(orderId), data: {});
+      if (order.remainingAmount > 0) {
+        await DioClient.instance.patch(
+          ApiEndpoints.orderConfirmMoney(orderId),
+          data: {'amount': order.remainingAmount},
+        );
+      }
+    }
+
     await fetchOrders();
     await _fetchHistory();
   }
 
   Future<void> returnToPending(String orderId) async {
     await DioClient.instance
-        .patch(ApiEndpoints.orderReturnToPending(orderId));
+        .patch(ApiEndpoints.orderReturnToPending(orderId), data: {});
     await fetchOrders();
   }
 
@@ -1140,6 +1149,18 @@ class _HistoryTabState extends ConsumerState<_HistoryTab> {
                         order: order,
                         mode: OrderCardMode.history,
                         onTap: () => _openDetail(context, order),
+                        onRecordPayment: order.remainingAmount > 0
+                            ? (amount) async {
+                                try {
+                                  await notifier.recordPayment(order.id, amount);
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Lỗi: $e')));
+                                  }
+                                }
+                              }
+                            : null,
                       );
                     },
                   ),

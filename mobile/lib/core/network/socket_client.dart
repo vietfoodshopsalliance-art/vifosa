@@ -20,4 +20,8 @@ class SocketClient {
   void onOrderStatusChanged(void Function(Map<String, dynamic> data) callback) {
     _handlers['order_status_changed'] = callback;
   }
+
+  void onPaymentStatusChanged(void Function(Map<String, dynamic> data) callback) {
+    _handlers['payment_status_changed'] = callback;
+  }
 }

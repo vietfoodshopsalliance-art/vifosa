@@ -42,7 +42,7 @@ class AuthRepository {
     try {
       await _dio.post(ApiEndpoints.logout);
     } catch (_) {}
-    await SecureStorage.clearAll();
+    await SecureStorage.clearTokens(); // giữ remember-me credentials
   }
 
   Future<Map<String, dynamic>> getMe() async {

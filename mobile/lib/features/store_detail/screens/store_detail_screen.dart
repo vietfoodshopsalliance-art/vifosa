@@ -10,6 +10,7 @@ import '../../../core/models/review.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/item_card.dart';
 import '../store_detail_provider.dart';
+import '../../cart/screens/cart_screen.dart' show cartProvider;
 
 class StoreDetailScreen extends ConsumerWidget {
   final String storeId;
@@ -20,6 +21,7 @@ class StoreDetailScreen extends ConsumerWidget {
     final storeAsync = ref.watch(storeDetailProvider(storeId));
     final menuAsync  = ref.watch(storeMenuProvider(storeId));
     final likedAsync = ref.watch(storeLikeProvider(storeId));
+    final totalItems = ref.watch(cartProvider).totalItems;
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -212,10 +214,16 @@ class StoreDetailScreen extends ConsumerWidget {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.go('/cart'),
-        icon: const Icon(Icons.shopping_cart),
-        label: const Text('Xem giỏ hàng'),
+      floatingActionButton: Badge(
+        isLabelVisible: totalItems > 0,
+        label: Text('$totalItems', style: const TextStyle(color: Colors.white, fontSize: 11)),
+        backgroundColor: Colors.red,
+        alignment: AlignmentDirectional.topEnd,
+        child: FloatingActionButton.extended(
+          onPressed: () => context.go('/cart'),
+          icon: const Icon(Icons.shopping_cart),
+          label: const Text('Xem giỏ hàng'),
+        ),
       ),
     );
   }

@@ -1,5 +1,6 @@
 // lib/features/cart/screens/cart_screen.dart
 
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +11,16 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../store/models/store_model.dart' show ShipFeeFormula;
+
+double _haversineKm(double lat1, double lng1, double lat2, double lng2) {
+  const r = 6371.0;
+  final dLat = (lat2 - lat1) * pi / 180;
+  final dLng = (lng2 - lng1) * pi / 180;
+  final a = sin(dLat / 2) * sin(dLat / 2) +
+      cos(lat1 * pi / 180) * cos(lat2 * pi / 180) * sin(dLng / 2) * sin(dLng / 2);
+  return r * 2 * atan2(sqrt(a), sqrt(1 - a));
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Formatter
@@ -129,12 +140,11 @@ class CartNotifier extends StateNotifier<CartState> {
   // ── Init ──────────────────────────────────────────────────────────────────
 
   Future<void> _init() async {
-    if (_isLoggedIn) {
-      await fetchFromServer();
-    } else {
-      await _loadFromHive();
-    }
+    await _loadFromHive();
   }
+
+  // Public: restore cart từ Hive (gọi sau khi login)
+  Future<void> syncFromHive() => _loadFromHive();
 
   // ── Server sync (logged-in) ───────────────────────────────────────────────
 
@@ -172,52 +182,54 @@ class CartNotifier extends StateNotifier<CartState> {
       return; // caller xử lý dialog rồi gọi lại replaceStore: true
     }
     _applyAdd(item, replaceStore: replaceStore);
+    _persistHive(); // Luôn lưu Hive — nguồn sự thật duy nhất
     if (_isLoggedIn) {
+      // Fire-and-forget khi backend có cart endpoint
       DioClient.instance.post(ApiEndpoints.cartItems, data: {
         'itemId': item.itemId,
         'quantity': item.quantity,
         'storeId': item.storeId,
-      }).catchError((_) => fetchFromServer());
-    } else {
-      _persistHive();
+      }).then<void>((_) {}, onError: (_) {});
     }
   }
 
   void updateQty(String itemId, int qty) {
     if (qty <= 0) { removeItem(itemId); return; }
     _applyUpdateQty(itemId, qty);
+    _persistHive();
     if (_isLoggedIn) {
       DioClient.instance
           .put(ApiEndpoints.cartItemById(itemId), data: {'quantity': qty})
-          .catchError((_) => fetchFromServer());
-    } else {
-      _persistHive();
+          .then<void>((_) {}, onError: (_) {});
     }
   }
 
   void removeItem(String itemId) {
     _applyRemove(itemId);
+    _persistHive();
     if (_isLoggedIn) {
       DioClient.instance
           .delete(ApiEndpoints.cartItemById(itemId))
-          .catchError((_) => fetchFromServer());
-    } else {
-      _persistHive();
+          .then<void>((_) {}, onError: (_) {});
     }
   }
 
   void updateNote(String note) {
     state = state.copyWith(note: note);
-    if (!_isLoggedIn) _persistHive();
+    _persistHive();
   }
 
   void clear() {
     state = const CartState();
+    _persistHive();
     if (_isLoggedIn) {
-      DioClient.instance.delete(ApiEndpoints.cart).catchError((_) {});
-    } else {
-      _persistHive();
+      DioClient.instance.delete(ApiEndpoints.cart).then<void>((_) {}, onError: (_) {});
     }
+  }
+
+  // Reset in-memory chỉ — Hive GIỮ NGUYÊN để restore sau khi login lại
+  void clearLocal() {
+    state = const CartState();
   }
 
   /// Alias giữ tương thích với menu_tab.dart
@@ -280,10 +292,12 @@ class CartNotifier extends StateNotifier<CartState> {
   Future<void> _loadFromHive() async {
     final box = await Hive.openBox(_boxKey);
     final rawItems = box.get(_hiveItemsKey, defaultValue: <dynamic>[]) as List;
+    final items = rawItems.map((e) => CartItem.fromJson(Map.from(e as Map))).toList();
+    // Guard: không restore storeId nếu items rỗng — tránh corrupt state
     state = CartState(
-      storeId:   box.get(_hiveStoreIdKey)   as String?,
-      storeName: box.get(_hiveStoreNameKey) as String?,
-      items: rawItems.map((e) => CartItem.fromJson(Map.from(e as Map))).toList(),
+      storeId:   items.isEmpty ? null : box.get(_hiveStoreIdKey)   as String?,
+      storeName: items.isEmpty ? null : box.get(_hiveStoreNameKey) as String?,
+      items: items,
       note: box.get(_hiveNoteKey, defaultValue: '') as String,
     );
   }
@@ -302,7 +316,18 @@ class CartNotifier extends StateNotifier<CartState> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 final cartProvider = StateNotifierProvider<CartNotifier, CartState>((ref) {
-  return CartNotifier(ref);
+  final notifier = CartNotifier(ref);
+  // Khi auth thay đổi: logout → xoá cart; login → fetch lại từ server
+  ref.listen<AuthState>(authProvider, (prev, next) {
+    final wasLoggedIn = prev?.user != null;
+    final isLoggedIn  = next.user != null;
+    if (wasLoggedIn && !isLoggedIn) {
+      notifier.clearLocal(); // logout: xóa in-memory, Hive vẫn giữ để restore sau
+    } else if (!wasLoggedIn && isLoggedIn) {
+      notifier.syncFromHive(); // login: restore từ Hive (backend cart chưa có endpoint)
+    }
+  });
+  return notifier;
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -372,16 +397,27 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     if (!isLoggedIn) return; // khách vãng lai: hiển thị "Tính khi đặt hàng"
 
     final gps = await _getDefaultAddressGps();
-    if (gps == null || !mounted) return; // không có địa chỉ mặc định
+    if (gps == null || !mounted) return;
 
     setState(() => _shipFeeLoading = true);
     try {
-      final dio = ref.read(dioClientProvider);
-      final res = await dio.dio.post(
-        ApiEndpoints.storeShipFee(storeId),
-        data: {'deliveryLat': gps.lat, 'deliveryLng': gps.lng, 'deliveryMethod': 'store_delivery'},
-      );
-      if (mounted) setState(() => _shipFee = (res.data['shipFee'] as num).toDouble());
+      final res = await DioClient.instance.get(ApiEndpoints.storeById(storeId));
+      final raw = res.data as Map<String, dynamic>;
+      final storeData = (raw['store'] ?? raw) as Map<String, dynamic>;
+
+      final formula = ShipFeeFormula.fromJson(
+          (storeData['shipFeeFormula'] as Map<String, dynamic>?) ?? {});
+      final coords = (storeData['address']?['location']?['coordinates']) as List?;
+      if (coords == null || coords.length < 2 || !mounted) {
+        setState(() => _shipFeeLoading = false);
+        return;
+      }
+      final storeLng = (coords[0] as num).toDouble();
+      final storeLat = (coords[1] as num).toDouble();
+
+      final km = _haversineKm(storeLat, storeLng, gps.lat, gps.lng);
+      final fee = (formula.calculate(km) / 1000).round() * 1000.0;
+      if (mounted) setState(() => _shipFee = fee);
     } catch (e) {
       debugPrint('Cart: ship fee error — $e');
       if (mounted) setState(() => _shipFee = null);
@@ -469,6 +505,13 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final cart = ref.watch(cartProvider);
     final notifier = ref.read(cartProvider.notifier);
     final theme = Theme.of(context);
+
+    // Khi cart load xong từ server (storeId từ null → có giá trị), fetch phí ship
+    ref.listen(cartProvider.select((s) => s.storeId), (prev, next) {
+      if (next != null && next.isNotEmpty && next != prev) {
+        _fetchShipFee();
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(

@@ -19,7 +19,7 @@ class UploadedImage {
       );
 }
 
-enum ImageUploadContext { avatar, storeCover, storeAvatar, menuItem, post, review, refundProof }
+enum ImageUploadContext { avatar, storeCover, storeAvatar, menuItem, post, review, refundProof, foodPhoto, receipt }
 
 extension ImageUploadContextX on ImageUploadContext {
   String get value => switch (this) {
@@ -30,6 +30,8 @@ extension ImageUploadContextX on ImageUploadContext {
         ImageUploadContext.post         => 'post',
         ImageUploadContext.review       => 'review',
         ImageUploadContext.refundProof  => 'refund_proof',
+        ImageUploadContext.foodPhoto    => 'food_photos',
+        ImageUploadContext.receipt      => 'receipts',
       };
 }
 
