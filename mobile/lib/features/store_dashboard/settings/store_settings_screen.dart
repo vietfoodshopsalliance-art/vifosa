@@ -12,6 +12,11 @@ import 'open_hours_editor.dart';
 
 // ─── Vietnamese banks list ────────────────────────────────────────────────────
 
+// Mapping key ngày → dayOfWeek index (0=Sun … 6=Sat, theo chuẩn backend)
+const _dayOfWeekMap = <String, int>{
+  'sun': 0, 'mon': 1, 'tue': 2, 'wed': 3, 'thu': 4, 'fri': 5, 'sat': 6,
+};
+
 const _banks = [
   'ACB',
   'Agribank',
@@ -113,8 +118,7 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
 
   Future<void> _loadSettings() async {
     try {
-      final dio = ref.read(dioClientProvider);
-      final res = await dio.dio.get(ApiEndpoints.storeById(widget.storeId));
+      final res = await DioClient.instance.get(ApiEndpoints.myStoreById(widget.storeId));
       final raw = res.data as Map<String, dynamic>;
       final d = (raw['store'] ?? raw) as Map<String, dynamic>;
             debugPrint('=== LOAD store data: $d');
@@ -205,22 +209,29 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
           'name': _nameCtrl.text.trim(),
           'description': _descCtrl.text.trim(),
           'phone': _phoneCtrl.text.trim(),
-          'address': {
-            'text': _addressCtrl.text.trim(),
-            if (_lat != null && _lng != null)
-              'location': {'type': 'Point', 'coordinates': [_lng, _lat]},
-          },
+          // Chỉ gửi address khi có toạ độ (location là required trong schema)
+          if (_lat != null && _lng != null)
+            'address': {
+              'text': _addressCtrl.text.trim(),
+              'location': {
+                'type': 'Point',
+                'coordinates': [_lng, _lat],
+              },
+            },
           if (avatarUrl != null) 'avatarImage': avatarUrl,
           if (coverUrl != null) 'coverImage': coverUrl,
-          'openingHours':
-              _openHours.entries.map((e) => e.value.toJson()).toList(),
+          // Thêm dayOfWeek vào mỗi entry (backend required: true)
+          'openingHours': _openHours.entries.map((e) => {
+            'dayOfWeek': _dayOfWeekMap[e.key] ?? 0,
+            ...e.value.toJson(),
+          }).toList(),
           'paymentMethods': {
             'bankTransfer': _pmBankTransfer,
             'cod': _pmCod,
             'fiftyFifty': _pmFiftyFifty,
           },
           'bankAccount': {
-            'bank': _selectedBank,
+            'bank': _selectedBank ?? '',
             'number': _bankNoCtrl.text.trim(),
             'holder': _bankNameCtrl.text.trim(),
           },
@@ -273,10 +284,9 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
       if (confirm != true) return;
     }
     try {
-      final dio = ref.read(dioClientProvider);
-      await dio.dio.put(
-        ApiEndpoints.storeSettingsEmergencyClose(widget.storeId),
-        data: {'emergencyClosed': value},
+      await DioClient.instance.patch(
+        ApiEndpoints.myStoreEmergencyClose(widget.storeId),
+        data: {'close': value},
       );
       setState(() => _emergencyClosed = value);
     } catch (e) {
@@ -482,17 +492,29 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
             const SizedBox(height: 20),
             const _SectionHeader('Phương thức thanh toán nhận'),
             _PaymentSwitch(
-                label: 'Chuyển khoản',
-                value: _pmBankTransfer,
-                onChanged: (v) => setState(() => _pmBankTransfer = v)),
+              label: 'Chuyển khoản',
+              value: _pmBankTransfer,
+              onChanged: (v) {
+                if (!v && !_pmCod && !_pmFiftyFifty) return;
+                setState(() => _pmBankTransfer = v);
+              },
+            ),
             _PaymentSwitch(
-                label: 'COD (tiền mặt)',
-                value: _pmCod,
-                onChanged: (v) => setState(() => _pmCod = v)),
+              label: 'COD (tiền mặt)',
+              value: _pmCod,
+              onChanged: (v) {
+                if (!v && !_pmBankTransfer && !_pmFiftyFifty) return;
+                setState(() => _pmCod = v);
+              },
+            ),
             _PaymentSwitch(
-                label: '50/50',
-                value: _pmFiftyFifty,
-                onChanged: (v) => setState(() => _pmFiftyFifty = v)),
+              label: '50/50',
+              value: _pmFiftyFifty,
+              onChanged: (v) {
+                if (!v && !_pmBankTransfer && !_pmCod) return;
+                setState(() => _pmFiftyFifty = v);
+              },
+            ),
 
             const SizedBox(height: 20),
             const _SectionHeader('Tài khoản ngân hàng quán'),

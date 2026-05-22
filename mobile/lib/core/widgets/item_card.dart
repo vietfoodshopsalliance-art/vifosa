@@ -5,6 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../models/category.dart';
+import '../models/store.dart' show StoreStatus;
+import '../../features/cart/screens/cart_screen.dart'
+    show cartProvider, CartItem, CartState;
 
 // ---------------------------------------------------------------------------
 // Formatter
@@ -14,32 +17,32 @@ final _vnd = NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits
 // ---------------------------------------------------------------------------
 // ItemCard
 // ---------------------------------------------------------------------------
-// Dùng trong StoreDetailScreen, nhận raw Map từ storeDetailProvider (FutureProvider)
-// hoặc CategoryItem từ storeMenuProvider.
-//
 // Props:
-//   item        — Map<String, dynamic> từ API (khớp với CategoryItem.fromJson)
+//   item        — CategoryItem (typed, từ storeMenuProvider)
 //   storeId     — để thêm vào cart
-//   storeStatus — 'open' | 'pre_order' | 'closed'; closed thì ẩn nút thêm
+//   storeName   — để gắn vào CartItem
+//   storeStatus — StoreStatus enum; emergencyClosed thì ẩn nút thêm
 // ---------------------------------------------------------------------------
 
 class ItemCard extends ConsumerWidget {
-  final Map<String, dynamic> item;
+  final CategoryItem item;
   final String storeId;
-  final String storeStatus;
+  final String storeName;
+  final StoreStatus storeStatus;
 
   const ItemCard({
     super.key,
     required this.item,
     required this.storeId,
+    required this.storeName,
     required this.storeStatus,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final parsed = CategoryItem.fromJson(item);
     final theme = Theme.of(context);
-    final canOrder = storeStatus != 'closed' && parsed.isAvailable;
+    // open và preOrder đều cho thêm vào giỏ (preOrder bắt buộc CK, xử lý ở checkout)
+    final canOrder = storeStatus != StoreStatus.emergencyClosed && item.isAvailable;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -49,9 +52,9 @@ class ItemCard extends ConsumerWidget {
           // ── Thumbnail ──────────────────────────────────────────────────
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: parsed.primaryImage != null
+            child: item.primaryImage != null
                 ? CachedNetworkImage(
-                    imageUrl: parsed.primaryImage!,
+                    imageUrl: item.primaryImage!,
                     width: 80,
                     height: 80,
                     fit: BoxFit.cover,
@@ -68,17 +71,17 @@ class ItemCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  parsed.name,
+                  item.name,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (parsed.description != null && parsed.description!.isNotEmpty) ...[
+                if (item.description != null && item.description!.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(
-                    parsed.description!,
+                    item.description!,
                     style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -88,23 +91,23 @@ class ItemCard extends ConsumerWidget {
                 Row(
                   children: [
                     Text(
-                      _vnd.format(parsed.price),
+                      _vnd.format(item.price),
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.primary,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    if (parsed.stock != null && parsed.stock! <= 10 && parsed.stock! > 0) ...[
+                    if (item.stock != null && item.stock! <= 10 && item.stock! > 0) ...[
                       const SizedBox(width: 8),
                       Text(
-                        'Còn ${parsed.stock}',
+                        'Còn ${item.stock}',
                         style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
                       ),
                     ],
-                    if (!parsed.isAvailable) ...[
+                    if (!item.isAvailable) ...[
                       const SizedBox(width: 8),
                       Text(
-                        parsed.stock == 0 ? 'Hết hàng' : 'Tạm ngưng',
+                        item.stock == 0 ? 'Hết hàng' : 'Tạm ngưng',
                         style: theme.textTheme.bodySmall?.copyWith(color: Colors.red),
                       ),
                     ],
@@ -118,7 +121,7 @@ class ItemCard extends ConsumerWidget {
 
           // ── Add button / counter ───────────────────────────────────────
           if (canOrder)
-            _AddRemoveButton(itemId: parsed.id, storeId: storeId, item: parsed)
+            _AddRemoveButton(item: item, storeId: storeId, storeName: storeName)
           else
             const SizedBox(width: 32),
         ],
@@ -135,36 +138,33 @@ class ItemCard extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// _AddRemoveButton — inline quantity stepper
-// Kết nối với cartProvider (stub module 05).
-// Thay thế bằng provider thực khi module 05 hoàn chỉnh.
+// _AddRemoveButton — inline quantity stepper kết nối cartProvider
 // ---------------------------------------------------------------------------
 
 class _AddRemoveButton extends ConsumerWidget {
-  final String itemId;
-  final String storeId;
   final CategoryItem item;
+  final String storeId;
+  final String storeName;
 
   const _AddRemoveButton({
-    required this.itemId,
-    required this.storeId,
     required this.item,
+    required this.storeId,
+    required this.storeName,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // TODO: replace with real cartProvider(storeId) when module 05 is done
-    // final cart = ref.watch(cartProvider(storeId));
-    // final qty = cart[itemId]?.quantity ?? 0;
-    const qty = 0; // stub
+    final cart = ref.watch(cartProvider);
+    final qty = cart.items.fold<int>(
+      0,
+      (sum, e) => e.itemId == item.id ? e.quantity : sum,
+    );
 
     if (qty == 0) {
       return _circleBtn(
         icon: Icons.add,
         color: Theme.of(context).colorScheme.primary,
-        onTap: () {
-          // ref.read(cartProvider(storeId).notifier).add(item);
-        },
+        onTap: () => _handleAdd(context, ref, cart),
       );
     }
 
@@ -174,25 +174,60 @@ class _AddRemoveButton extends ConsumerWidget {
         _circleBtn(
           icon: Icons.remove,
           color: Colors.grey.shade400,
-          onTap: () {
-            // ref.read(cartProvider(storeId).notifier).remove(itemId);
-          },
+          onTap: () => ref.read(cartProvider.notifier).updateQty(item.id, qty - 1),
         ),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 6),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Text(
             '$qty',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
         _circleBtn(
           icon: Icons.add,
           color: Theme.of(context).colorScheme.primary,
-          onTap: () {
-            // ref.read(cartProvider(storeId).notifier).add(item);
-          },
+          onTap: () => _handleAdd(context, ref, cart),
         ),
       ],
+    );
+  }
+
+  Future<void> _handleAdd(BuildContext context, WidgetRef ref, CartState cart) async {
+    if (cart.items.isNotEmpty && cart.storeId != storeId) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Xoá giỏ hàng?'),
+          content: Text(
+            'Giỏ hàng đang có món từ ${cart.storeName}. Xoá và thêm món mới?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Huỷ'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Xoá và thêm'),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+      ref.read(cartProvider.notifier).clearCart();
+    }
+
+    ref.read(cartProvider.notifier).addItem(
+      CartItem(
+        itemId: item.id,
+        name: item.name,
+        price: item.price.toDouble(),
+        imageUrl: item.primaryImage,
+        storeId: storeId,
+        storeName: storeName,
+        quantity: 1,
+        stock: item.stock,
+      ),
     );
   }
 
@@ -215,5 +250,3 @@ class _AddRemoveButton extends ConsumerWidget {
         ),
       );
 }
-
-// lib/core/widgets/item_card.dart

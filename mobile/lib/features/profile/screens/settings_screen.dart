@@ -1,4 +1,4 @@
-// lib/features/auth/screens/settings_screen.dart
+// lib/features/profile/screens/settings_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

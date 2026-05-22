@@ -28,14 +28,15 @@ class MenuCategoryModel {
     required this.items,
   });
 
-  factory MenuCategoryModel.fromJson(Map<String, dynamic> j) =>
+  factory MenuCategoryModel.fromJson(
+    Map<String, dynamic> j, {
+    List<MenuItemModel> items = const [],
+  }) =>
       MenuCategoryModel(
-        id: j['_id'] ?? '',
-        name: j['name'] ?? '',
-        sortOrder: j['sortOrder'] ?? 0,
-        items: (j['items'] as List? ?? [])
-            .map((e) => MenuItemModel.fromJson(e))
-            .toList(),
+        id: (j['_id'] ?? '').toString(),
+        name: j['name'] as String? ?? '',
+        sortOrder: j['displayOrder'] as int? ?? 0,
+        items: items,
       );
 }
 
@@ -45,8 +46,10 @@ class MenuItemModel {
   final String? description;
   final double price;
   final String? imageUrl;
-  final bool isAvailable;
+  final bool isAvailable; // status == 'active'
+  final String status;    // 'active' | 'closed' | 'paused'
   final String categoryId;
+  final int? stock;       // null = vô hạn
 
   const MenuItemModel({
     required this.id,
@@ -55,18 +58,26 @@ class MenuItemModel {
     required this.price,
     this.imageUrl,
     required this.isAvailable,
+    required this.status,
     required this.categoryId,
+    this.stock,
   });
 
-  factory MenuItemModel.fromJson(Map<String, dynamic> j) => MenuItemModel(
-        id: j['_id'] ?? '',
-        name: j['name'] ?? '',
-        description: j['description'],
-        price: (j['price'] ?? 0).toDouble(),
-        imageUrl: j['image'],
-        isAvailable: j['isAvailable'] ?? true,
-        categoryId: j['category'] ?? '',
-      );
+  factory MenuItemModel.fromJson(Map<String, dynamic> j) {
+    final images = (j['images'] as List?)?.cast<String>() ?? [];
+    final status = j['status'] as String? ?? 'active';
+    return MenuItemModel(
+      id: (j['_id'] ?? '').toString(),
+      name: j['name'] as String? ?? '',
+      description: j['description'] as String?,
+      price: (j['price'] as num? ?? 0).toDouble(),
+      imageUrl: images.isNotEmpty ? images.first : null,
+      isAvailable: status == 'active',
+      status: status,
+      categoryId: (j['categoryId'] ?? '').toString(),
+      stock: j['stock'] as int?,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -111,12 +122,27 @@ class StoreMenuNotifier extends StateNotifier<StoreMenuState> {
   Future<void> _load() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final res = await DioClient.instance
-          .get(ApiEndpoints.storeMenu(storeId));
+      // Dùng /menu/all để chủ quán thấy cả món bị paused
+      final res =
+          await DioClient.instance.get(ApiEndpoints.storeMenuAll(storeId));
       final data = res.data as Map<String, dynamic>;
-      final cats = (data['categories'] as List? ?? [])
-          .map((e) => MenuCategoryModel.fromJson(e))
-          .toList();
+
+      final rawItems = (data['items'] as List? ?? []);
+      final itemsByCat = <String, List<MenuItemModel>>{};
+      for (final raw in rawItems) {
+        final item = MenuItemModel.fromJson(raw as Map<String, dynamic>);
+        itemsByCat.putIfAbsent(item.categoryId, () => []).add(item);
+      }
+
+      final cats = (data['categories'] as List? ?? []).map((e) {
+        final catJson = e as Map<String, dynamic>;
+        final catId = (catJson['_id'] ?? '').toString();
+        return MenuCategoryModel.fromJson(
+          catJson,
+          items: itemsByCat[catId] ?? [],
+        );
+      }).toList();
+
       state = state.copyWith(categories: cats, isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -128,8 +154,18 @@ class StoreMenuNotifier extends StateNotifier<StoreMenuState> {
   Future<void> toggleItemAvailability(String itemId, bool current) async {
     try {
       await DioClient.instance.patch(
-        '${ApiEndpoints.storeItems(storeId)}/$itemId',
-        data: {'isAvailable': !current},
+        ApiEndpoints.storeItemById(storeId, itemId),
+        data: {'status': current ? 'closed' : 'active'},
+      );
+      await _load();
+    } catch (_) {}
+  }
+
+  Future<void> adjustItemStock(String itemId, int? newStock) async {
+    try {
+      await DioClient.instance.patch(
+        ApiEndpoints.storeItemById(storeId, itemId),
+        data: {'stock': newStock},
       );
       await _load();
     } catch (_) {}
@@ -138,7 +174,7 @@ class StoreMenuNotifier extends StateNotifier<StoreMenuState> {
   Future<void> deleteItem(String itemId) async {
     try {
       await DioClient.instance
-          .delete('${ApiEndpoints.storeItems(storeId)}/$itemId');
+          .delete(ApiEndpoints.storeItemById(storeId, itemId));
       await _load();
     } catch (_) {}
   }
@@ -146,7 +182,7 @@ class StoreMenuNotifier extends StateNotifier<StoreMenuState> {
   Future<void> deleteCategory(String categoryId) async {
     try {
       await DioClient.instance
-          .delete('${ApiEndpoints.storeCategories(storeId)}/$categoryId');
+          .delete(ApiEndpoints.storeCategoryById(storeId, categoryId));
       await _load();
     } catch (_) {}
   }
@@ -224,16 +260,9 @@ class StoreMenuScreen extends ConsumerWidget {
                           onEditCategory: () => _showCategoryDialog(
                               context, ref, storeId, state.categories[i]),
                           onDeleteCategory: () => _confirmDeleteCategory(
-                              context,
-                              ref,
-                              storeId,
-                              state.categories[i].id),
+                              context, ref, storeId, state.categories[i].id),
                           onAddItem: () => _showItemDialog(
-                              context,
-                              ref,
-                              storeId,
-                              null,
-                              state.categories,
+                              context, ref, storeId, null, state.categories,
                               defaultCategoryId: state.categories[i].id),
                           onEditItem: (item) => _showItemDialog(
                               context, ref, storeId, item, state.categories),
@@ -241,6 +270,8 @@ class StoreMenuScreen extends ConsumerWidget {
                               .read(storeMenuProvider(storeId).notifier)
                               .toggleItemAvailability(
                                   item.id, item.isAvailable),
+                          onAdjustStock: (item) =>
+                              _showStockDialog(context, ref, storeId, item),
                           onDeleteItem: (item) => _confirmDeleteItem(
                               context, ref, storeId, item.id),
                         ),
@@ -295,6 +326,25 @@ class StoreMenuScreen extends ConsumerWidget {
     );
   }
 
+  void _showStockDialog(
+    BuildContext context,
+    WidgetRef ref,
+    String storeId,
+    MenuItemModel item,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => _StockAdjustDialog(
+        storeId: storeId,
+        item: item,
+        onSaved: () {
+          Navigator.pop(ctx);
+          ref.read(storeMenuProvider(storeId).notifier).refresh();
+        },
+      ),
+    );
+  }
+
   void _confirmDeleteCategory(
     BuildContext context,
     WidgetRef ref,
@@ -305,11 +355,11 @@ class StoreMenuScreen extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Xoá danh mục?'),
-        content:
-            const Text('Tất cả món trong danh mục cũng sẽ bị xoá.'),
+        content: const Text('Tất cả món trong danh mục cũng sẽ bị xoá.'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Huỷ')),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Huỷ')),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
@@ -338,7 +388,8 @@ class StoreMenuScreen extends ConsumerWidget {
         content: const Text('Thao tác không thể hoàn tác.'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Huỷ')),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Huỷ')),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
@@ -367,6 +418,7 @@ class _CategorySection extends StatelessWidget {
   final VoidCallback onAddItem;
   final void Function(MenuItemModel) onEditItem;
   final void Function(MenuItemModel) onToggleItem;
+  final void Function(MenuItemModel) onAdjustStock;
   final void Function(MenuItemModel) onDeleteItem;
 
   const _CategorySection({
@@ -377,6 +429,7 @@ class _CategorySection extends StatelessWidget {
     required this.onAddItem,
     required this.onEditItem,
     required this.onToggleItem,
+    required this.onAdjustStock,
     required this.onDeleteItem,
   });
 
@@ -385,7 +438,7 @@ class _CategorySection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Category header
+        // Header danh mục
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
           child: Row(
@@ -435,6 +488,7 @@ class _CategorySection extends StatelessWidget {
               item: item,
               onEdit: () => onEditItem(item),
               onToggle: () => onToggleItem(item),
+              onAdjustStock: () => onAdjustStock(item),
               onDelete: () => onDeleteItem(item),
             ),
           ),
@@ -453,12 +507,14 @@ class _MenuItemTile extends StatelessWidget {
   final MenuItemModel item;
   final VoidCallback onEdit;
   final VoidCallback onToggle;
+  final VoidCallback onAdjustStock;
   final VoidCallback onDelete;
 
   const _MenuItemTile({
     required this.item,
     required this.onEdit,
     required this.onToggle,
+    required this.onAdjustStock,
     required this.onDelete,
   });
 
@@ -467,10 +523,11 @@ class _MenuItemTile extends StatelessWidget {
     final formatter = NumberFormat('#,###', 'vi_VN');
 
     return Opacity(
-      opacity: item.isAvailable ? 1.0 : 0.5,
+      opacity: item.isAvailable ? 1.0 : 0.55,
       child: Card(
         margin: const EdgeInsets.only(bottom: 8),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         child: ListTile(
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -501,12 +558,22 @@ class _MenuItemTile extends StatelessWidget {
                   item.description!,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  style:
+                      const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
-              Text(
-                '${formatter.format(item.price)}đ',
-                style: const TextStyle(
-                    color: AppTheme.primary, fontWeight: FontWeight.w600),
+              Row(
+                children: [
+                  Text(
+                    '${formatter.format(item.price)}đ',
+                    style: const TextStyle(
+                        color: AppTheme.primary,
+                        fontWeight: FontWeight.w600),
+                  ),
+                  if (item.stock != null) ...[
+                    const SizedBox(width: 8),
+                    _StockChip(stock: item.stock!),
+                  ],
+                ],
               ),
             ],
           ),
@@ -523,10 +590,15 @@ class _MenuItemTile extends StatelessWidget {
                 icon: const Icon(Icons.more_vert, size: 18),
                 onSelected: (v) {
                   if (v == 'edit') onEdit();
+                  if (v == 'stock') onAdjustStock();
                   if (v == 'delete') onDelete();
                 },
                 itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'edit', child: Text('Sửa')),
+                  PopupMenuItem(value: 'edit', child: Text('Sửa món')),
+                  PopupMenuItem(
+                    value: 'stock',
+                    child: Text('Tồn kho'),
+                  ),
                   PopupMenuItem(
                     value: 'delete',
                     child:
@@ -538,6 +610,162 @@ class _MenuItemTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Stock Chip
+// ---------------------------------------------------------------------------
+
+class _StockChip extends StatelessWidget {
+  final int stock;
+  const _StockChip({required this.stock});
+
+  @override
+  Widget build(BuildContext context) {
+    final isEmpty = stock == 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: isEmpty ? Colors.red.shade50 : Colors.green.shade50,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: isEmpty ? Colors.red.shade200 : Colors.green.shade200,
+        ),
+      ),
+      child: Text(
+        isEmpty ? 'Hết hàng' : 'Còn $stock',
+        style: TextStyle(
+          fontSize: 11,
+          color:
+              isEmpty ? Colors.red.shade700 : Colors.green.shade700,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Stock Adjust Dialog
+// ---------------------------------------------------------------------------
+
+class _StockAdjustDialog extends StatefulWidget {
+  final String storeId;
+  final MenuItemModel item;
+  final VoidCallback onSaved;
+
+  const _StockAdjustDialog({
+    required this.storeId,
+    required this.item,
+    required this.onSaved,
+  });
+
+  @override
+  State<_StockAdjustDialog> createState() => _StockAdjustDialogState();
+}
+
+class _StockAdjustDialogState extends State<_StockAdjustDialog> {
+  late bool _trackStock;
+  late final TextEditingController _stockCtrl;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _trackStock = widget.item.stock != null;
+    _stockCtrl = TextEditingController(
+      text: widget.item.stock?.toString() ?? '0',
+    );
+  }
+
+  @override
+  void dispose() {
+    _stockCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      final newStock = _trackStock
+          ? (int.tryParse(_stockCtrl.text.trim()) ?? 0)
+          : null;
+      await DioClient.instance.patch(
+        ApiEndpoints.storeItemById(widget.storeId, widget.item.id),
+        data: {'stock': newStock},
+      );
+      widget.onSaved();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text(
+        'Tồn kho',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.item.name,
+            style: const TextStyle(color: Colors.grey, fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          SwitchListTile(
+            title: const Text('Theo dõi tồn kho'),
+            subtitle: const Text('Tắt = bán vô hạn'),
+            value: _trackStock,
+            onChanged: (v) => setState(() => _trackStock = v),
+            contentPadding: EdgeInsets.zero,
+            activeThumbColor: AppTheme.primary,
+          ),
+          if (_trackStock) ...[
+            const SizedBox(height: 8),
+            TextField(
+              controller: _stockCtrl,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Số lượng còn lại',
+                border: OutlineInputBorder(),
+                suffixText: 'phần',
+              ),
+            ),
+          ] else
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Bán không giới hạn số lượng.',
+                style:
+                    TextStyle(color: Colors.grey.shade500, fontSize: 12),
+              ),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Huỷ'),
+        ),
+        AppButton(
+          label: 'Lưu',
+          onPressed: _saving ? null : _save,
+          isLoading: _saving,
+          variant: ButtonVariant.primary,
+        ),
+      ],
     );
   }
 }
@@ -568,8 +796,7 @@ class _CategoryDialogState extends State<_CategoryDialog> {
   @override
   void initState() {
     super.initState();
-    _nameCtrl =
-        TextEditingController(text: widget.existing?.name ?? '');
+    _nameCtrl = TextEditingController(text: widget.existing?.name ?? '');
   }
 
   @override
@@ -584,7 +811,8 @@ class _CategoryDialogState extends State<_CategoryDialog> {
     try {
       if (widget.existing != null) {
         await DioClient.instance.patch(
-          '${ApiEndpoints.storeCategories(widget.storeId)}/${widget.existing!.id}',
+          ApiEndpoints.storeCategoryById(
+              widget.storeId, widget.existing!.id),
           data: {'name': _nameCtrl.text.trim()},
         );
       } else {
@@ -594,15 +822,21 @@ class _CategoryDialogState extends State<_CategoryDialog> {
         );
       }
       widget.onSaved();
-    } catch (_) {
-      setState(() => _saving = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi: $e')),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.existing != null ? 'Sửa danh mục' : 'Thêm danh mục'),
+      title:
+          Text(widget.existing != null ? 'Sửa danh mục' : 'Thêm danh mục'),
       content: TextField(
         controller: _nameCtrl,
         autofocus: true,
@@ -653,9 +887,11 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
   final _nameCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
+  final _stockCtrl = TextEditingController();
   String? _selectedCategoryId;
   XFile? _imageFile;
   String? _existingImageUrl;
+  bool _trackStock = false;
   bool _saving = false;
 
   @override
@@ -668,9 +904,11 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
       _descCtrl.text = e.description ?? '';
       _selectedCategoryId = e.categoryId;
       _existingImageUrl = e.imageUrl;
+      _trackStock = e.stock != null;
+      _stockCtrl.text = e.stock?.toString() ?? '0';
     } else {
-      _selectedCategoryId = widget.defaultCategoryId ??
-          widget.categories.firstOrNull?.id;
+      _selectedCategoryId =
+          widget.defaultCategoryId ?? widget.categories.firstOrNull?.id;
     }
   }
 
@@ -679,6 +917,7 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
     _nameCtrl.dispose();
     _priceCtrl.dispose();
     _descCtrl.dispose();
+    _stockCtrl.dispose();
     super.dispose();
   }
 
@@ -689,29 +928,35 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
   }
 
   Future<void> _save() async {
-    if (_nameCtrl.text.trim().isEmpty || _priceCtrl.text.trim().isEmpty) return;
+    if (_nameCtrl.text.trim().isEmpty || _priceCtrl.text.trim().isEmpty) {
+      return;
+    }
     setState(() => _saving = true);
     try {
-      String? imageUrl = _existingImageUrl;
+      String? newImageUrl;
       if (_imageFile != null) {
         final uploaded = await ImageService.instance.uploadXFile(
           _imageFile!,
           context: ImageUploadContext.menuItem,
         );
-        imageUrl = uploaded.url;
+        newImageUrl = uploaded.url;
       }
 
-      final data = {
+      final data = <String, dynamic>{
         'name': _nameCtrl.text.trim(),
         'price': double.tryParse(_priceCtrl.text.trim()) ?? 0,
         'description': _descCtrl.text.trim(),
-        'category': _selectedCategoryId,
-        if (imageUrl != null) 'image': imageUrl,
+        'categoryId': _selectedCategoryId,
+        if (newImageUrl != null) 'images': [newImageUrl],
+        'stock': _trackStock
+            ? (int.tryParse(_stockCtrl.text.trim()) ?? 0)
+            : null,
       };
 
       if (widget.existing != null) {
         await DioClient.instance.patch(
-          '${ApiEndpoints.storeItems(widget.storeId)}/${widget.existing!.id}',
+          ApiEndpoints.storeItemById(
+              widget.storeId, widget.existing!.id),
           data: data,
         );
       } else {
@@ -719,8 +964,13 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
             .post(ApiEndpoints.storeItems(widget.storeId), data: data);
       }
       widget.onSaved();
-    } catch (_) {
-      setState(() => _saving = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi: $e')),
+        );
+      }
     }
   }
 
@@ -738,8 +988,8 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
           children: [
             Text(
               widget.existing != null ? 'Sửa món' : 'Thêm món mới',
-              style: const TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.w700),
+              style:
+                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 16),
 
@@ -757,7 +1007,8 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
                 child: _imageFile != null
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(10),
-                        child: Image.file(File(_imageFile!.path), fit: BoxFit.cover),
+                        child: Image.file(File(_imageFile!.path),
+                            fit: BoxFit.cover),
                       )
                     : _existingImageUrl != null
                         ? ClipRRect(
@@ -819,13 +1070,36 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
                 border: OutlineInputBorder(),
               ),
               items: widget.categories
-                  .map((c) => DropdownMenuItem(
-                      value: c.id, child: Text(c.name)))
+                  .map((c) =>
+                      DropdownMenuItem(value: c.id, child: Text(c.name)))
                   .toList(),
               onChanged: (v) => setState(() => _selectedCategoryId = v),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 4),
 
+            // ── Tồn kho ───────────────────────────────────────────────────
+            SwitchListTile(
+              title: const Text('Theo dõi tồn kho'),
+              subtitle: const Text('Tắt = bán vô hạn'),
+              value: _trackStock,
+              onChanged: (v) => setState(() => _trackStock = v),
+              contentPadding: EdgeInsets.zero,
+              activeThumbColor: AppTheme.primary,
+            ),
+            if (_trackStock) ...[
+              TextField(
+                controller: _stockCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Số lượng tồn kho',
+                  border: OutlineInputBorder(),
+                  suffixText: 'phần',
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
               child: AppButton(
@@ -842,6 +1116,10 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Empty Menu View
+// ---------------------------------------------------------------------------
+
 class _EmptyMenuView extends StatelessWidget {
   final VoidCallback onAddCategory;
   const _EmptyMenuView({required this.onAddCategory});
@@ -852,11 +1130,11 @@ class _EmptyMenuView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.restaurant_menu, size: 64, color: Colors.grey.shade300),
+          Icon(Icons.restaurant_menu,
+              size: 64, color: Colors.grey.shade300),
           const SizedBox(height: 16),
           const Text('Menu trống',
-              style:
-                  TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           const Text(
             'Hãy tạo danh mục trước, rồi thêm món vào',

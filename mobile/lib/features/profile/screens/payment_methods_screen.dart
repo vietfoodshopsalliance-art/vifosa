@@ -1,28 +1,16 @@
-// 📁 mobile/lib/features/profile/screens/payment_methods_screen.dart
-// Vifosa — Viet Food Shops Alliance
-// Payment Methods Screen — Cài đặt phương thức thanh toán mặc định của khách
-// Ref spec: §5.1.11, §BIZ-6, §0.4 OD-4, schema `users.bankAccountForRefund`
+// lib/features/profile/screens/payment_methods_screen.dart
+// Spec §5.1.11, §BIZ-6, §0.4 OD-4, schema users.bankAccountForRefund
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import '../../../../../core/utils/app_snackbar.dart';
-import '../../../core/models/payment_method_model.dart';
-import '../../store_dashboard/providers/payment_methods_provider.dart';
+import '../../../core/utils/app_snackbar.dart';
+import '../providers/payment_methods_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
-/// Màn hình cài đặt thanh toán của người dùng (role: customer).
-///
-/// Gồm 2 phần:
-///   1. Chọn phương thức thanh toán mặc định (bank_transfer / momo / zalo_pay / cod)
-///      — chỉ hiển thị phương thức quán hỗ trợ khi vào màn hình đặt hàng;
-///      ở đây user lưu preference cá nhân.
-///   2. Tài khoản ngân hàng nhận hoàn tiền (`bankAccountForRefund`)
-///      — spec §5.1.11, §7.4 refund flow step 2.
 class PaymentMethodsScreen extends ConsumerStatefulWidget {
   const PaymentMethodsScreen({super.key});
 
@@ -40,29 +28,18 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
     });
   }
 
-  // ---- Phương thức thanh toán mặc định ------------------------------------
-
   void _selectDefaultMethod(PaymentType type) {
     ref.read(paymentMethodsProvider.notifier).setDefaultMethod(type);
   }
 
-  // ---- Tài khoản ngân hàng nhận hoàn tiền ---------------------------------
-
-  void _openAddBankAccount() {
-    final state = ref.read(paymentMethodsProvider);
-    _showBankAccountSheet(existing: state.bankAccountForRefund);
-  }
-
-  void _openEditBankAccount() {
+  void _openBankAccountSheet() {
     final state = ref.read(paymentMethodsProvider);
     _showBankAccountSheet(existing: state.bankAccountForRefund);
   }
 
   void _showBankAccountSheet({BankAccount? existing}) {
-    final numberCtrl =
-        TextEditingController(text: existing?.accountNumber ?? '');
-    final holderCtrl =
-        TextEditingController(text: existing?.accountHolder ?? '');
+    final numberCtrl = TextEditingController(text: existing?.accountNumber ?? '');
+    final holderCtrl = TextEditingController(text: existing?.accountHolder ?? '');
     String selectedBank = existing?.bankCode ?? '';
     final formKey = GlobalKey<FormState>();
 
@@ -71,14 +48,11 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(ctx).bottom,
-        ),
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
         child: Container(
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           child: StatefulBuilder(
@@ -88,7 +62,6 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Drag handle
                   Center(
                     child: Container(
                       width: 40,
@@ -101,12 +74,11 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
                     ),
                   ),
                   Text(
-                    existing == null
-                        ? 'Thêm TK nhận hoàn tiền'
-                        : 'Sửa TK nhận hoàn tiền',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                    existing == null ? 'Thêm TK nhận hoàn tiền' : 'Sửa TK nhận hoàn tiền',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -118,9 +90,8 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Chọn ngân hàng
                   DropdownButtonFormField<String>(
-                    initialValue: selectedBank.isEmpty ? null : selectedBank,
+                    value: selectedBank.isEmpty ? null : selectedBank,
                     decoration: const InputDecoration(
                       labelText: 'Ngân hàng *',
                       border: OutlineInputBorder(),
@@ -133,12 +104,10 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
                         .toList(),
                     validator: (v) =>
                         (v == null || v.isEmpty) ? 'Vui lòng chọn ngân hàng' : null,
-                    onChanged: (v) =>
-                        setSheetState(() => selectedBank = v ?? ''),
+                    onChanged: (v) => setSheetState(() => selectedBank = v ?? ''),
                   ),
                   const SizedBox(height: 12),
 
-                  // Số tài khoản
                   TextFormField(
                     controller: numberCtrl,
                     decoration: const InputDecoration(
@@ -146,22 +115,15 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
                       border: OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                    ],
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     validator: (v) {
-                      if (v == null || v.trim().isEmpty) {
-                        return 'Vui lòng nhập số tài khoản';
-                      }
-                      if (v.trim().length < 6) {
-                        return 'Số tài khoản không hợp lệ';
-                      }
+                      if (v == null || v.trim().isEmpty) return 'Vui lòng nhập số tài khoản';
+                      if (v.trim().length < 6) return 'Số tài khoản không hợp lệ';
                       return null;
                     },
                   ),
                   const SizedBox(height: 12),
 
-                  // Chủ tài khoản
                   TextFormField(
                     controller: holderCtrl,
                     decoration: const InputDecoration(
@@ -177,16 +139,13 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Nút lưu
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
                       onPressed: () async {
                         if (!formKey.currentState!.validate()) return;
                         Navigator.pop(ctx);
-                        await ref
-                            .read(paymentMethodsProvider.notifier)
-                            .saveBankAccount(
+                        await ref.read(paymentMethodsProvider.notifier).saveBankAccount(
                               bankCode: selectedBank,
                               accountNumber: numberCtrl.text.trim(),
                               accountHolder: holderCtrl.text.trim().toUpperCase(),
@@ -207,8 +166,6 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
     );
   }
 
-  // ---- Build --------------------------------------------------------------
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(paymentMethodsProvider);
@@ -224,8 +181,7 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
                 Text(state.errorMessage ?? 'Có lỗi xảy ra'),
                 const SizedBox(height: 12),
                 OutlinedButton(
-                  onPressed: () =>
-                      ref.read(paymentMethodsProvider.notifier).load(),
+                  onPressed: () => ref.read(paymentMethodsProvider.notifier).load(),
                   child: const Text('Thử lại'),
                 ),
               ],
@@ -234,7 +190,6 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
         _ => ListView(
             padding: const EdgeInsets.symmetric(vertical: 8),
             children: [
-              // ── Phương thức mặc định ──────────────────────────────────────
               const _SectionHeader(title: 'Phương thức mặc định'),
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -258,7 +213,6 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
 
               const Divider(height: 32),
 
-              // ── TK ngân hàng nhận hoàn tiền ───────────────────────────────
               const _SectionHeader(title: 'TK ngân hàng nhận hoàn tiền'),
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -272,7 +226,7 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
               if (state.bankAccountForRefund != null)
                 _BankAccountCard(
                   account: state.bankAccountForRefund!,
-                  onEdit: _openEditBankAccount,
+                  onEdit: _openBankAccountSheet,
                 )
               else
                 Padding(
@@ -280,7 +234,7 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
                   child: OutlinedButton.icon(
                     icon: const Icon(Icons.add),
                     label: const Text('Thêm tài khoản ngân hàng'),
-                    onPressed: _openAddBankAccount,
+                    onPressed: _openBankAccountSheet,
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size.fromHeight(48),
                     ),
@@ -289,7 +243,6 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
 
               const SizedBox(height: 24),
 
-              // ── Ghi chú BIZ-6 ─────────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Container(
@@ -325,7 +278,7 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// Widgets nội bộ
+// Widgets
 // ---------------------------------------------------------------------------
 
 class _SectionHeader extends StatelessWidget {
@@ -399,24 +352,17 @@ class _BankAccountCard extends StatelessWidget {
           margin: EdgeInsets.zero,
           child: ListTile(
             leading: const Icon(Icons.account_balance_outlined),
-            title: Text(
-              account.bankCode,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
+            title: Text(account.bankCode,
+                style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(account.accountNumber),
-                Text(
-                  account.accountHolder,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
+                Text(account.accountHolder,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
               ],
             ),
-            trailing: TextButton(
-              onPressed: onEdit,
-              child: const Text('Sửa'),
-            ),
+            trailing: TextButton(onPressed: onEdit, child: const Text('Sửa')),
             isThreeLine: true,
           ),
         ),
@@ -424,48 +370,9 @@ class _BankAccountCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Models
-// ---------------------------------------------------------------------------
-
-/// Các phương thức thanh toán hỗ trợ trong MVP
-/// Spec §5.3.1: bankTransfer / cod / fiftyFifty / momo / zaloPay
-enum PaymentType {
-  bankTransfer,
-  cod,
-  fiftyFifty,
-  momo,
-  zaloPay,
-}
-
-class BankAccount {
-  final String bankCode;
-  final String accountNumber;
-  final String accountHolder;
-
-  const BankAccount({
-    required this.bankCode,
-    required this.accountNumber,
-    required this.accountHolder,
-  });
-
-  factory BankAccount.fromJson(Map<String, dynamic> json) => BankAccount(
-        bankCode: json['bank'] as String,
-        accountNumber: json['number'] as String,
-        accountHolder: json['holder'] as String,
-      );
-
-  Map<String, dynamic> toJson() => {
-        'bank': bankCode,
-        'number': accountNumber,
-        'holder': accountHolder,
-      };
-}
-
-// ---------------------------------------------------------------------------
 // Static data
 // ---------------------------------------------------------------------------
 
-/// Danh sách option hiển thị — spec §5.3.1 paymentMethods
 class _PaymentOption {
   final IconData icon;
   final String label;
@@ -512,135 +419,22 @@ const _paymentOptions = [
   ),
 ];
 
-/// Danh sách ngân hàng phổ biến tại VN (không đủ tất cả — chỉ MVP)
 const _supportedBanks = [
-  {'code': 'VCB', 'name': 'Vietcombank'},
-  {'code': 'TCB', 'name': 'Techcombank'},
-  {'code': 'MB', 'name': 'MB Bank'},
-  {'code': 'VPB', 'name': 'VPBank'},
-  {'code': 'ACB', 'name': 'ACB'},
-  {'code': 'BIDV', 'name': 'BIDV'},
-  {'code': 'VTB', 'name': 'Vietinbank'},
-  {'code': 'STB', 'name': 'Sacombank'},
-  {'code': 'TPB', 'name': 'TPBank'},
-  {'code': 'OCB', 'name': 'OCB'},
-  {'code': 'MSB', 'name': 'Maritime Bank'},
-  {'code': 'SHB', 'name': 'SHB'},
-  {'code': 'VIB', 'name': 'VIB'},
-  {'code': 'HDBank', 'name': 'HDBank'},
-  {'code': 'CAKE', 'name': 'CAKE (VPBank Digital)'},
-  {'code': 'Timo', 'name': 'Timo (VPBank)'},
-  {'code': 'KHAC', 'name': 'Ngân hàng khác'},
+  {'code': 'VCB',   'name': 'Vietcombank'},
+  {'code': 'TCB',   'name': 'Techcombank'},
+  {'code': 'MB',    'name': 'MB Bank'},
+  {'code': 'VPB',   'name': 'VPBank'},
+  {'code': 'ACB',   'name': 'ACB'},
+  {'code': 'BIDV',  'name': 'BIDV'},
+  {'code': 'VTB',   'name': 'Vietinbank'},
+  {'code': 'STB',   'name': 'Sacombank'},
+  {'code': 'TPB',   'name': 'TPBank'},
+  {'code': 'OCB',   'name': 'OCB'},
+  {'code': 'MSB',   'name': 'Maritime Bank'},
+  {'code': 'SHB',   'name': 'SHB'},
+  {'code': 'VIB',   'name': 'VIB'},
+  {'code': 'HDBank','name': 'HDBank'},
+  {'code': 'CAKE',  'name': 'CAKE (VPBank Digital)'},
+  {'code': 'Timo',  'name': 'Timo (VPBank)'},
+  {'code': 'KHAC',  'name': 'Ngân hàng khác'},
 ];
-
-// ---------------------------------------------------------------------------
-// Provider state & notifier
-// Tách ra: mobile/lib/features/profile/providers/payment_methods_provider.dart
-// ---------------------------------------------------------------------------
-
-enum PmStatus { initial, loading, loaded, error }
-
-class PaymentMethodsState {
-  final PmStatus status;
-  final PaymentType? defaultMethod;
-  final BankAccount? bankAccountForRefund;
-  final bool isSavingDefault;
-  final String? errorMessage;
-
-  const PaymentMethodsState({
-    this.status = PmStatus.initial,
-    this.defaultMethod,
-    this.bankAccountForRefund,
-    this.isSavingDefault = false,
-    this.errorMessage,
-  });
-
-  PaymentMethodsState copyWith({
-    PmStatus? status,
-    PaymentType? defaultMethod,
-    BankAccount? bankAccountForRefund,
-    bool? isSavingDefault,
-    String? errorMessage,
-    bool clearBankAccount = false,
-  }) =>
-      PaymentMethodsState(
-        status: status ?? this.status,
-        defaultMethod: defaultMethod ?? this.defaultMethod,
-        bankAccountForRefund: clearBankAccount
-            ? null
-            : bankAccountForRefund ?? this.bankAccountForRefund,
-        isSavingDefault: isSavingDefault ?? this.isSavingDefault,
-        errorMessage: errorMessage ?? this.errorMessage,
-      );
-}
-
-final paymentMethodsProvider =
-    StateNotifierProvider<PaymentMethodsNotifier, PaymentMethodsState>((ref) {
-  return PaymentMethodsNotifier();
-});
-
-class PaymentMethodsNotifier extends StateNotifier<PaymentMethodsState> {
-  PaymentMethodsNotifier() : super(const PaymentMethodsState());
-
-  /// Load setting từ server — spec: preference lưu phía user profile
-  Future<void> load() async {
-    state = state.copyWith(status: PmStatus.loading);
-    try {
-      // TODO: gọi API GET /me hoặc GET /me/payment-settings
-      // final res = await dio.get('/me');
-      // final data = res.data;
-      // final rawMethod = data['defaultPaymentMethod'] as String?;
-      // final bankJson = data['bankAccountForRefund'];
-      await Future.delayed(const Duration(milliseconds: 400));
-
-      state = state.copyWith(
-        status: PmStatus.loaded,
-        defaultMethod: PaymentType.bankTransfer, // fallback default
-        bankAccountForRefund: null, // user chưa lưu
-      );
-    } catch (e) {
-      state = state.copyWith(
-        status: PmStatus.error,
-        errorMessage: e.toString(),
-      );
-    }
-  }
-
-  /// Đặt phương thức thanh toán mặc định — spec §5.1.11
-  Future<void> setDefaultMethod(PaymentType type) async {
-    state = state.copyWith(isSavingDefault: true, defaultMethod: type);
-    try {
-      // TODO: gọi API PATCH /me/payment-settings
-      // await dio.patch('/me/payment-settings', data: {'defaultPaymentMethod': type.name});
-      await Future.delayed(const Duration(milliseconds: 300));
-      state = state.copyWith(isSavingDefault: false);
-    } catch (_) {
-      // Rollback không cần thiết vì chỉ là preference, giữ giá trị mới
-      state = state.copyWith(isSavingDefault: false);
-    }
-  }
-
-  /// Lưu tài khoản ngân hàng nhận hoàn — spec §5.1.11, §7.4 refund step 2
-  /// Schema: `users.bankAccountForRefund: { number, bank, holder }`
-  Future<void> saveBankAccount({
-    required String bankCode,
-    required String accountNumber,
-    required String accountHolder,
-  }) async {
-    final account = BankAccount(
-      bankCode: bankCode,
-      accountNumber: accountNumber,
-      accountHolder: accountHolder,
-    );
-    try {
-      // TODO: gọi API PATCH /me/bank-account-refund
-      // await dio.patch('/me/bank-account-refund', data: account.toJson());
-      await Future.delayed(const Duration(milliseconds: 300));
-      state = state.copyWith(bankAccountForRefund: account);
-    } catch (e) {
-      rethrow;
-    }
-  }
-}
-
-// 📁 mobile/lib/features/profile/screens/payment_methods_screen.dart (end of file)

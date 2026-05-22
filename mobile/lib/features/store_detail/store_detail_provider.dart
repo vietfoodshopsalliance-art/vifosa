@@ -8,25 +8,31 @@ import '../../core/network/dio_client.dart';
 import '../../core/network/api_endpoints.dart';
 
 // ---------------------------------------------------------------------------
-// Store detail
+// Store detail — trả Store model (dùng bởi menu_tab, widgets, v.v.)
 // ---------------------------------------------------------------------------
 final storeDetailProvider =
-    FutureProvider.family<Store, String>((ref, storeId) async {
-  final res =
-      await DioClient.instance.get(ApiEndpoints.storeDetail(storeId));
+    FutureProvider.autoDispose.family<Store, String>((ref, storeId) async {
+  final res = await DioClient.instance.get(ApiEndpoints.storeDetail(storeId));
   return Store.fromJson(res.data as Map<String, dynamic>);
 });
 
 // ---------------------------------------------------------------------------
-// Store menu
+// Store menu — gom items theo categoryId từ API {categories,items} riêng
 // ---------------------------------------------------------------------------
 final storeMenuProvider =
-    FutureProvider.family<List<Category>, String>((ref, storeId) async {
-  final res =
-      await DioClient.instance.get(ApiEndpoints.storeMenu(storeId));
-  return (res.data['categories'] as List)
-      .map((e) => Category.fromJson(e as Map<String, dynamic>))
-      .toList();
+    FutureProvider.autoDispose.family<List<Category>, String>((ref, storeId) async {
+  final res = await DioClient.instance.get(ApiEndpoints.storeMenu(storeId));
+  final cats  = List<Map<String, dynamic>>.from(res.data['categories'] ?? []);
+  final items = List<Map<String, dynamic>>.from(res.data['items']      ?? []);
+  final byCategory = <String, List<Map<String, dynamic>>>{};
+  for (final item in items) {
+    final cid = (item['categoryId'] ?? '').toString();
+    byCategory.putIfAbsent(cid, () => []).add(item);
+  }
+  return cats.map((cat) {
+    final cid = (cat['_id'] ?? cat['id'] ?? '').toString();
+    return Category.fromJson({...cat, 'items': byCategory[cid] ?? <Map<String, dynamic>>[]});
+  }).toList();
 });
 
 // ---------------------------------------------------------------------------

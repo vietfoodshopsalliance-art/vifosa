@@ -14,17 +14,17 @@ import '../../../core/widgets/store_card.dart';
 // Providers
 // ---------------------------------------------------------------------------
 final _favItemsProvider = FutureProvider<List<MenuItem>>((ref) async {
-  final res = await DioClient.instance
-      .get(ApiEndpoints.favorites, queryParameters: {'type': 'item'});
-  return (res.data['items'] as List)
+  final res = await DioClient.instance.get(ApiEndpoints.favoriteItems);
+  final list = res.data is Map ? (res.data['items'] ?? res.data['data'] ?? []) : res.data;
+  return (list as List)
       .map((e) => MenuItem.fromJson(e as Map<String, dynamic>))
       .toList();
 });
 
 final _favStoresProvider = FutureProvider<List<Store>>((ref) async {
-  final res = await DioClient.instance
-      .get(ApiEndpoints.favorites, queryParameters: {'type': 'store'});
-  return (res.data['stores'] as List)
+  final res = await DioClient.instance.get(ApiEndpoints.favoriteStores);
+  final list = res.data is Map ? (res.data['stores'] ?? res.data['data'] ?? []) : res.data;
+  return (list as List)
       .map((e) => Store.fromJson(e as Map<String, dynamic>))
       .toList();
 });

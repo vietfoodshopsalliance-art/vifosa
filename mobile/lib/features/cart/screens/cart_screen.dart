@@ -74,12 +74,16 @@ class CartState {
   final String? storeName;
   final List<CartItem> items;
   final String note;
+  final bool isLoading;
+  final String? error;
 
   const CartState({
     this.storeId,
     this.storeName,
     this.items = const [],
     this.note = '',
+    this.isLoading = false,
+    this.error,
   });
 
   double get subtotal => items.fold(0, (sum, i) => sum + i.price * i.quantity);
@@ -91,12 +95,16 @@ class CartState {
     String? storeName,
     List<CartItem>? items,
     String? note,
+    bool? isLoading,
+    String? error,
   }) =>
       CartState(
         storeId: storeId ?? this.storeId,
         storeName: storeName ?? this.storeName,
         items: items ?? this.items,
         note: note ?? this.note,
+        isLoading: isLoading ?? this.isLoading,
+        error: error,
       );
 }
 
@@ -113,131 +121,179 @@ class CartNotifier extends StateNotifier<CartState> {
   static const _hiveStoreNameKey = 'storeName';
 
   CartNotifier(this._ref) : super(const CartState()) {
-    _load();
+    _init();
   }
 
   bool get _isLoggedIn => _ref.read(authProvider).user != null;
 
-  // ── Load ──────────────────────────────────────────────────────────────────
+  // ── Init ──────────────────────────────────────────────────────────────────
 
-  Future<void> _load() async {
-    await _loadFromHive();
+  Future<void> _init() async {
+    if (_isLoggedIn) {
+      await fetchFromServer();
+    } else {
+      await _loadFromHive();
+    }
   }
+
+  // ── Server sync (logged-in) ───────────────────────────────────────────────
+
+  Future<void> fetchFromServer() async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final res = await DioClient.instance.get(ApiEndpoints.cart);
+      final data = res.data as Map<String, dynamic>;
+      final sid = data['storeId'] as String?;
+      final sname = data['storeName'] as String?;
+      final items = (data['items'] as List<dynamic>? ?? []).map((e) {
+        final m = e as Map<String, dynamic>;
+        return CartItem.fromJson({
+          ...m,
+          'storeId':   m['storeId']   ?? sid   ?? '',
+          'storeName': m['storeName'] ?? sname ?? '',
+        });
+      }).toList();
+      state = CartState(
+        storeId: sid,
+        storeName: sname,
+        items: items,
+        note: data['note'] as String? ?? '',
+      );
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  // ── Public API ────────────────────────────────────────────────────────────
+
+  /// Thêm món. [replaceStore] = true khi user đã xác nhận xoá giỏ cũ.
+  void addItem(CartItem item, {bool replaceStore = false}) {
+    if (state.storeId != null && state.storeId != item.storeId && !replaceStore) {
+      return; // caller xử lý dialog rồi gọi lại replaceStore: true
+    }
+    _applyAdd(item, replaceStore: replaceStore);
+    if (_isLoggedIn) {
+      DioClient.instance.post(ApiEndpoints.cartItems, data: {
+        'itemId': item.itemId,
+        'quantity': item.quantity,
+        'storeId': item.storeId,
+      }).catchError((_) => fetchFromServer());
+    } else {
+      _persistHive();
+    }
+  }
+
+  void updateQty(String itemId, int qty) {
+    if (qty <= 0) { removeItem(itemId); return; }
+    _applyUpdateQty(itemId, qty);
+    if (_isLoggedIn) {
+      DioClient.instance
+          .put(ApiEndpoints.cartItemById(itemId), data: {'quantity': qty})
+          .catchError((_) => fetchFromServer());
+    } else {
+      _persistHive();
+    }
+  }
+
+  void removeItem(String itemId) {
+    _applyRemove(itemId);
+    if (_isLoggedIn) {
+      DioClient.instance
+          .delete(ApiEndpoints.cartItemById(itemId))
+          .catchError((_) => fetchFromServer());
+    } else {
+      _persistHive();
+    }
+  }
+
+  void updateNote(String note) {
+    state = state.copyWith(note: note);
+    if (!_isLoggedIn) _persistHive();
+  }
+
+  void clear() {
+    state = const CartState();
+    if (_isLoggedIn) {
+      DioClient.instance.delete(ApiEndpoints.cart).catchError((_) {});
+    } else {
+      _persistHive();
+    }
+  }
+
+  /// Alias giữ tương thích với menu_tab.dart
+  void clearCart() => clear();
+
+  // ── Local mutations (optimistic) ──────────────────────────────────────────
+
+  void _applyAdd(CartItem item, {bool replaceStore = false}) {
+    final List<CartItem> updated;
+    if (replaceStore && state.storeId != item.storeId) {
+      updated = [item];
+    } else {
+      final idx = state.items.indexWhere((e) => e.itemId == item.itemId);
+      if (idx >= 0) {
+        final copy = [...state.items];
+        final ex = copy[idx];
+        final newQty = ex.quantity + item.quantity;
+        final capped = ex.stock != null ? newQty.clamp(1, ex.stock!) : newQty;
+        copy[idx] = CartItem(
+          itemId: ex.itemId, name: ex.name, price: ex.price,
+          imageUrl: ex.imageUrl, storeId: ex.storeId, storeName: ex.storeName,
+          quantity: capped, stock: ex.stock,
+        );
+        updated = copy;
+      } else {
+        updated = [...state.items, item];
+      }
+    }
+    state = state.copyWith(
+      storeId: item.storeId,
+      storeName: item.storeName,
+      items: updated,
+    );
+  }
+
+  void _applyUpdateQty(String itemId, int qty) {
+    final updated = state.items.map((e) {
+      if (e.itemId != itemId) return e;
+      final capped = e.stock != null ? qty.clamp(1, e.stock!) : qty;
+      return CartItem(
+        itemId: e.itemId, name: e.name, price: e.price,
+        imageUrl: e.imageUrl, storeId: e.storeId, storeName: e.storeName,
+        quantity: capped, stock: e.stock,
+      );
+    }).toList();
+    state = state.copyWith(items: updated);
+  }
+
+  void _applyRemove(String itemId) {
+    final updated = state.items.where((e) => e.itemId != itemId).toList();
+    if (updated.isEmpty) {
+      state = CartState(note: state.note);
+    } else {
+      state = state.copyWith(items: updated);
+    }
+  }
+
+  // ── Hive (guest) ──────────────────────────────────────────────────────────
 
   Future<void> _loadFromHive() async {
     final box = await Hive.openBox(_boxKey);
     final rawItems = box.get(_hiveItemsKey, defaultValue: <dynamic>[]) as List;
     state = CartState(
-      storeId: box.get(_hiveStoreIdKey) as String?,
+      storeId:   box.get(_hiveStoreIdKey)   as String?,
       storeName: box.get(_hiveStoreNameKey) as String?,
       items: rawItems.map((e) => CartItem.fromJson(Map.from(e as Map))).toList(),
       note: box.get(_hiveNoteKey, defaultValue: '') as String,
     );
   }
 
-  // ── Persist ───────────────────────────────────────────────────────────────
-
   Future<void> _persistHive() async {
     final box = await Hive.openBox(_boxKey);
-    await box.put(_hiveItemsKey, state.items.map((e) => e.toJson()).toList());
-    await box.put(_hiveNoteKey, state.note);
+    await box.put(_hiveItemsKey,   state.items.map((e) => e.toJson()).toList());
+    await box.put(_hiveNoteKey,    state.note);
     await box.put(_hiveStoreIdKey, state.storeId);
     await box.put(_hiveStoreNameKey, state.storeName);
-  }
-
-  Future<void> _afterMutation() async {
-    await _persistHive();
-  }
-
-  // ── Public API ────────────────────────────────────────────────────────────
-
-  /// Thêm món. Gọi từ StoreDetailScreen.
-  /// [replaceStore] = true khi user xác nhận xoá giỏ cũ từ quán khác.
-  void addItem(CartItem item, {bool replaceStore = false}) {
-    if (state.storeId != null &&
-        state.storeId != item.storeId &&
-        !replaceStore) {
-      // Caller phải xử lý dialog rồi gọi lại với replaceStore: true
-      return;
-    }
-
-    List<CartItem> updated;
-    if (replaceStore && state.storeId != item.storeId) {
-      updated = [item];
-    } else {
-      final idx = state.items.indexWhere((e) => e.itemId == item.itemId);
-      if (idx >= 0) {
-        updated = [...state.items];
-        final existing = updated[idx];
-        final newQty = existing.quantity + item.quantity;
-        // Respect stock limit
-        final capped = existing.stock != null
-            ? newQty.clamp(1, existing.stock!)
-            : newQty;
-        updated[idx] = CartItem(
-          itemId: existing.itemId,
-          name: existing.name,
-          price: existing.price,
-          imageUrl: existing.imageUrl,
-          storeId: existing.storeId,
-          storeName: existing.storeName,
-          quantity: capped,
-          stock: existing.stock,
-        );
-      } else {
-        updated = [...state.items, item];
-      }
-    }
-
-    state = state.copyWith(
-      storeId: item.storeId,
-      storeName: item.storeName,
-      items: updated,
-    );
-    _afterMutation();
-  }
-
-  void updateQty(String itemId, int qty) {
-    if (qty <= 0) {
-      removeItem(itemId);
-      return;
-    }
-    final updated = state.items.map((e) {
-      if (e.itemId != itemId) return e;
-      final capped = e.stock != null ? qty.clamp(1, e.stock!) : qty;
-      return CartItem(
-        itemId: e.itemId,
-        name: e.name,
-        price: e.price,
-        imageUrl: e.imageUrl,
-        storeId: e.storeId,
-        storeName: e.storeName,
-        quantity: capped,
-        stock: e.stock,
-      );
-    }).toList();
-    state = state.copyWith(items: updated);
-    _afterMutation();
-  }
-
-  void removeItem(String itemId) {
-    final updated = state.items.where((e) => e.itemId != itemId).toList();
-    state = state.copyWith(
-      items: updated,
-      storeId: updated.isEmpty ? null : state.storeId,
-      storeName: updated.isEmpty ? null : state.storeName,
-    );
-    _afterMutation();
-  }
-
-  void updateNote(String note) {
-    state = state.copyWith(note: note);
-    _afterMutation();
-  }
-
-  void clear() {
-    state = const CartState();
-    _afterMutation();
   }
 }
 

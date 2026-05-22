@@ -33,11 +33,12 @@ class ApiEndpoints {
   static String storeById(String id)                      => '/stores/$id';
   static String storeDetail(String id)                    => '/stores/$id';
   static String storeMenu(String id)                      => '/stores/$id/menu';
-  static String storeCategories(String id)                => '/stores/$id/categories';
-  static String storeCategoryById(String sid, String cid) => '/stores/$sid/categories/$cid';
-  static String storeCategoryReorder(String id)           => '/stores/$id/categories/reorder';
-  static String storeItems(String id)                     => '/stores/$id/items';
-  static String storeItemById(String sid, String iid)     => '/stores/$sid/items/$iid';
+  static String storeMenuAll(String id)                   => '/stores/$id/menu/all';
+  static String storeCategories(String id)                => '/stores/$id/menu/categories';
+  static String storeCategoryById(String sid, String cid) => '/stores/$sid/menu/categories/$cid';
+  static String storeCategoryReorder(String id)           => '/stores/$id/menu/categories/reorder';
+  static String storeItems(String id)                     => '/stores/$id/menu/items';
+  static String storeItemById(String sid, String iid)     => '/stores/$sid/menu/items/$iid';
   static String storeItemStock(String sid, String iid)    => '/stores/$sid/items/$iid/stock';
   static String storeItemStatus(String sid, String iid)   => '/stores/$sid/items/$iid/status';
   static String storeItemImages(String sid, String iid)   => '/stores/$sid/items/$iid/images';
@@ -58,6 +59,7 @@ class ApiEndpoints {
   // ── Store (owner) endpoints ───────────────────────────────────────────────
   static String myStoreById(String id)             => '/me/stores/$id';
   static String myStoreOrders(String id)           => '/me/stores/$id/orders';
+  static String myStoreOpen(String id)             => '/me/stores/$id/open';
   static String myStoreEmergencyClose(String id)   => '/me/stores/$id/emergency-close';
 
   // ── Store Memberships ─────────────────────────────────────────────────────
@@ -119,11 +121,12 @@ class ApiEndpoints {
   static String reviewImages(String id) => '/reviews/$id/images';
 
   // ── Likes / Favorites ─────────────────────────────────────────────────────
-  static const String likes           = '/likes';
-  static String storeLiked(String id) => '/stores/$id/liked';
-  static String itemLiked(String id)  => '/items/$id/liked';
-  static const String favoriteStores  = '/me/favorites/stores';
-  static const String favoriteItems   = '/me/favorites/items';
+  static const String likes            = '/likes';
+  static String likeDelete(String id)  => '/likes/$id';
+  static String storeLiked(String id)  => '/stores/$id/liked';
+  static String itemLiked(String id)   => '/items/$id/liked';
+  static const String favoriteStores   = '/me/favorites/stores';
+  static const String favoriteItems    = '/me/favorites/items';
 
   // ── Social — Posts ────────────────────────────────────────────────────────
   static const String posts                                    = '/posts';

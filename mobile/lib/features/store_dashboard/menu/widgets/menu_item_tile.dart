@@ -2,7 +2,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/menu_provider.dart';
+import '../../../../features/cart/screens/cart_screen.dart'
+    show cartProvider, CartItem, CartNotifier, CartState;
 
 class MenuItemTile extends StatelessWidget {
   final MenuItem item;
@@ -269,18 +272,24 @@ class CategoryDragTile extends StatelessWidget {
 class CustomerItemCard extends ConsumerWidget {
   final MenuItem item;
   final String storeId;
+  final String storeName;
   final bool canOrder;
 
   const CustomerItemCard({
     super.key,
     required this.item,
     required this.storeId,
+    this.storeName = '',
     required this.canOrder,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cartQty = ref.watch(cartItemQtyProvider(item.id));
+    final cartQty = ref
+        .watch(cartProvider)
+        .items
+        .where((e) => e.itemId == item.id)
+        .fold(0, (s, e) => s + e.quantity);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -364,12 +373,31 @@ class CustomerItemCard extends ConsumerWidget {
                         if (canOrder)
                           _QuantityControl(
                             quantity: cartQty,
-                            onAdd: () => ref
-                                .read(cartProvider(storeId).notifier)
-                                .add(item),
-                            onRemove: () => ref
-                                .read(cartProvider(storeId).notifier)
-                                .remove(item.id),
+                            onAdd: () => ref.read(cartProvider.notifier).addItem(
+                                  CartItem(
+                                    itemId: item.id,
+                                    name: item.name,
+                                    price: item.price.toDouble(),
+                                    imageUrl: item.images.isNotEmpty
+                                        ? item.images.first
+                                        : null,
+                                    storeId: storeId,
+                                    storeName: storeName,
+                                    quantity: 1,
+                                    stock: item.stock,
+                                  ),
+                                ),
+                            onRemove: () {
+                              if (cartQty > 1) {
+                                ref
+                                    .read(cartProvider.notifier)
+                                    .updateQty(item.id, cartQty - 1);
+                              } else {
+                                ref
+                                    .read(cartProvider.notifier)
+                                    .removeItem(item.id);
+                              }
+                            },
                           )
                         else
                           const Text(
@@ -419,6 +447,7 @@ class CustomerItemCard extends ConsumerWidget {
       builder: (_) => _ItemDetailSheet(
         item: item,
         storeId: storeId,
+        storeName: storeName,
         canOrder: canOrder,
       ),
     );
@@ -502,17 +531,23 @@ class _QuantityControl extends StatelessWidget {
 class _ItemDetailSheet extends ConsumerWidget {
   final MenuItem item;
   final String storeId;
+  final String storeName;
   final bool canOrder;
 
   const _ItemDetailSheet({
     required this.item,
     required this.storeId,
+    this.storeName = '',
     required this.canOrder,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cartQty = ref.watch(cartItemQtyProvider(item.id));
+    final cartQty = ref
+        .watch(cartProvider)
+        .items
+        .where((e) => e.itemId == item.id)
+        .fold(0, (s, e) => s + e.quantity);
 
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
@@ -617,12 +652,31 @@ class _ItemDetailSheet extends ConsumerWidget {
                         children: [
                           _QuantityControl(
                             quantity: cartQty,
-                            onAdd: () => ref
-                                .read(cartProvider(storeId).notifier)
-                                .add(item),
-                            onRemove: () => ref
-                                .read(cartProvider(storeId).notifier)
-                                .remove(item.id),
+                            onAdd: () => ref.read(cartProvider.notifier).addItem(
+                                  CartItem(
+                                    itemId: item.id,
+                                    name: item.name,
+                                    price: item.price.toDouble(),
+                                    imageUrl: item.images.isNotEmpty
+                                        ? item.images.first
+                                        : null,
+                                    storeId: storeId,
+                                    storeName: storeName,
+                                    quantity: 1,
+                                    stock: item.stock,
+                                  ),
+                                ),
+                            onRemove: () {
+                              if (cartQty > 1) {
+                                ref
+                                    .read(cartProvider.notifier)
+                                    .updateQty(item.id, cartQty - 1);
+                              } else {
+                                ref
+                                    .read(cartProvider.notifier)
+                                    .removeItem(item.id);
+                              }
+                            },
                           ),
                           const Spacer(),
                           if (cartQty > 0)
@@ -888,12 +942,11 @@ class CartBottomBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cart = ref.watch(cartProvider(storeId));
+    final cart = ref.watch(cartProvider);
     if (cart.isEmpty) return const SizedBox.shrink();
 
-    final totalQty = cart.values.fold(0, (sum, item) => sum + item.quantity);
-    final totalPrice =
-        cart.values.fold(0, (sum, item) => sum + item.quantity * item.price);
+    final totalQty = cart.totalItems;
+    final totalPrice = cart.subtotal;
 
     return Container(
       padding: EdgeInsets.only(
@@ -913,10 +966,7 @@ class CartBottomBar extends ConsumerWidget {
         ],
       ),
       child: ElevatedButton(
-        onPressed: () {
-          // Navigate to cart/checkout — module 05
-          Navigator.pushNamed(context, '/cart', arguments: storeId);
-        },
+        onPressed: () => context.go('/cart'),
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFFF6B35),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -969,8 +1019,9 @@ class CartBottomBar extends ConsumerWidget {
     );
   }
 
-  String _formatPrice(int price) {
-    final parts = price.toString().split('');
+  String _formatPrice(double price) {
+    final intPrice = price.round();
+    final parts = intPrice.toString().split('');
     final result = StringBuffer();
     for (int i = 0; i < parts.length; i++) {
       if (i > 0 && (parts.length - i) % 3 == 0) result.write('.');

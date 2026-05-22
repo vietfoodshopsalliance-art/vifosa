@@ -24,15 +24,24 @@ class DayHours {
         close:  close  ?? this.close,
       );
 
-  Map<String, dynamic> toJson() =>
-      closed ? {'closed': true} : {'open': open, 'close': close};
+  // Backend schema: { dayOfWeek, isClosed, open, close }
+  // dayOfWeek được inject bởi caller (store_settings_screen)
+  Map<String, dynamic> toJson() => {
+    'isClosed': closed,
+    'open':  open,
+    'close': close,
+  };
 
   factory DayHours.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const DayHours();
-    if (json['closed'] == true) return const DayHours(closed: true);
+    // Backend dùng 'isClosed', fallback 'closed' cho compatibility
+    final isClosed = json['isClosed'] as bool?
+        ?? json['closed'] as bool?
+        ?? false;
     return DayHours(
-      open:  json['open']  as String? ?? '08:00',
-      close: json['close'] as String? ?? '22:00',
+      closed: isClosed,
+      open:   json['open']  as String? ?? '08:00',
+      close:  json['close'] as String? ?? '22:00',
     );
   }
 }

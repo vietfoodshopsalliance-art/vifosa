@@ -239,10 +239,27 @@ class StoreOrdersNotifier extends StateNotifier<StoreOrdersState> {
 
   // ─── Actions ──────────────────────────────────────────────────────────────
 
-  Future<void> toggleEmergencyClose() async {
+  /// [open] = true  → mở cửa: clear emergencyClosed + set isOpen=true
+  /// [open] = false → đóng cửa khẩn cấp
+  Future<void> setStoreOpen(bool open) async {
     try {
-      await DioClient.instance
-          .patch(ApiEndpoints.myStoreEmergencyClose(storeId), data: {});
+      if (open) {
+        await Future.wait([
+          DioClient.instance.patch(
+            ApiEndpoints.myStoreEmergencyClose(storeId),
+            data: {'close': false},
+          ),
+          DioClient.instance.patch(
+            ApiEndpoints.myStoreOpen(storeId),
+            data: {'open': true},
+          ),
+        ]);
+      } else {
+        await DioClient.instance.patch(
+          ApiEndpoints.myStoreEmergencyClose(storeId),
+          data: {'close': true},
+        );
+      }
       await _fetchStoreInfo();
     } catch (e) {
       rethrow;
@@ -450,9 +467,10 @@ class _StoreOrdersScreenState extends ConsumerState<StoreOrdersScreen>
         );
         if (confirmed != true) return;
         try {
+          // closed=true → muốn mở, closed=false → muốn đóng
           await ref
               .read(storeOrdersProvider(widget.storeId).notifier)
-              .toggleEmergencyClose();
+              .setStoreOpen(closed);
         } catch (e) {
           if (mounted) {
             ScaffoldMessenger.of(context)
