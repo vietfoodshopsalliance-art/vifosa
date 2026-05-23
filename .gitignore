@@ -6,3 +6,6 @@ node_modules
 
 backend/.env
 .vercel
+
+# Claude Code local settings (contains tokens)
+.claude/settings.local.json
