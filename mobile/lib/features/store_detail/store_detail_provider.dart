@@ -6,6 +6,7 @@ import '../../core/models/category.dart';
 import '../../core/models/review.dart';
 import '../../core/network/dio_client.dart';
 import '../../core/network/api_endpoints.dart';
+import '../../core/providers/favorites_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Store detail — trả Store model (dùng bởi menu_tab, widgets, v.v.)
@@ -41,20 +42,26 @@ final storeMenuProvider =
 final storeLikeProvider =
     StateNotifierProvider.family<StoreLikeNotifier, AsyncValue<bool>, String>(
         (ref, storeId) {
-  // Lấy initialValue từ storeDetail khi đã load
   final detail = ref.watch(storeDetailProvider(storeId));
   return StoreLikeNotifier(
+    ref: ref,
     storeId: storeId,
-    initial: detail.valueOrNull?.likeId != null,
+    initialLikeId: detail.valueOrNull?.likeId,
   );
 });
 
 class StoreLikeNotifier extends StateNotifier<AsyncValue<bool>> {
+  final Ref _ref;
   final String storeId;
   String? _likeId;
 
-  StoreLikeNotifier({required this.storeId, required bool initial})
-      : super(AsyncValue.data(initial));
+  StoreLikeNotifier({
+    required Ref ref,
+    required this.storeId,
+    String? initialLikeId,
+  })  : _ref = ref,
+        _likeId = initialLikeId,
+        super(AsyncValue.data(initialLikeId != null));
 
   Future<void> toggle() async {
     final current = state.valueOrNull ?? false;
@@ -70,9 +77,11 @@ class StoreLikeNotifier extends StateNotifier<AsyncValue<bool>> {
       } else {
         if (_likeId != null) {
           await DioClient.instance.delete(ApiEndpoints.likeDelete(_likeId!));
+          _likeId = null;
         }
         state = const AsyncValue.data(false);
       }
+      _ref.invalidate(favStoresProvider);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
@@ -171,3 +180,46 @@ final storeReviewsProvider = StateNotifierProvider.family<ReviewsNotifier,
     ReviewsState, String>(
   (ref, storeId) => ReviewsNotifier(storeId),
 );
+
+// ---------------------------------------------------------------------------
+// Like item toggle — args: (itemId, initialLikeId)
+// ---------------------------------------------------------------------------
+final itemLikeProvider = StateNotifierProvider.autoDispose
+    .family<ItemLikeNotifier, AsyncValue<bool>, (String, String?)>(
+  (ref, args) => ItemLikeNotifier(ref: ref, itemId: args.$1, initialLikeId: args.$2),
+);
+
+class ItemLikeNotifier extends StateNotifier<AsyncValue<bool>> {
+  final Ref _ref;
+  final String itemId;
+  String? _likeId;
+
+  ItemLikeNotifier({required Ref ref, required this.itemId, String? initialLikeId})
+      : _ref = ref,
+        _likeId = initialLikeId,
+        super(AsyncValue.data(initialLikeId != null));
+
+  Future<void> toggle() async {
+    final current = state.valueOrNull ?? false;
+    state = const AsyncValue.loading();
+    try {
+      if (!current) {
+        final res = await DioClient.instance.post(
+          ApiEndpoints.likes,
+          data: {'type': 'item', 'targetId': itemId},
+        );
+        _likeId = res.data['id']?.toString();
+        state = const AsyncValue.data(true);
+      } else {
+        if (_likeId != null) {
+          await DioClient.instance.delete(ApiEndpoints.likeDelete(_likeId!));
+          _likeId = null;
+        }
+        state = const AsyncValue.data(false);
+      }
+      _ref.invalidate(favItemsProvider);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+}

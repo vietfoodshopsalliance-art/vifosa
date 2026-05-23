@@ -28,6 +28,9 @@ import '../../features/store_dashboard/screens/store_manage_screen.dart';
 import '../../features/profile/screens/favorites_screen.dart';
 import '../../features/notifications/screens/notifications_screen.dart';
 import '../../features/store_detail/screens/store_detail_screen.dart';
+import '../../features/store_detail/screens/item_detail_screen.dart';
+import '../models/category.dart';
+import '../models/store.dart' show StoreStatus;
 import '../../features/order/screens/order_tracking_screen.dart';
 import '../../features/order/screens/checkout_screen.dart';
 import '../widgets/scaffold_with_nav.dart';
@@ -128,6 +131,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, state) => StoreDetailScreen(
           storeId: state.pathParameters['id']!,
         ),
+      ),
+      GoRoute(
+        path: '/item-detail',
+        builder: (_, state) {
+          final extra = state.extra as Map<String, dynamic>;
+          return ItemDetailScreen(
+            item: extra['item'] as CategoryItem,
+            storeId: extra['storeId'] as String,
+            storeName: extra['storeName'] as String,
+            storeStatus: extra['storeStatus'] as StoreStatus,
+          );
+        },
       ),
 
       // ── Checkout & Orders ─────────────────────────────────────────────────

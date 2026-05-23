@@ -33,6 +33,7 @@ class CategoryItem {
   final List<String> images;
   final int? stock;       // null = không quản lý kho
   final String status;   // active | closed | paused
+  final String? likeId;
 
   const CategoryItem({
     required this.id,
@@ -42,6 +43,7 @@ class CategoryItem {
     required this.images,
     this.stock,
     required this.status,
+    this.likeId,
   });
 
   bool get isAvailable => status == 'active' && stock != 0;
@@ -56,6 +58,7 @@ class CategoryItem {
         images: List<String>.from(json['images'] as List? ?? []),
         stock: json['stock'] as int?,
         status: json['status'] as String? ?? 'active',
+        likeId: json['likeId'] as String?,
       );
 }
 

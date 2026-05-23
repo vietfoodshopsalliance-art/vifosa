@@ -62,6 +62,14 @@ class StoreCardHorizontal extends StatelessWidget {
                         style: const TextStyle(
                             fontSize: 12, color: Colors.black54),
                       ),
+                      if (store.totalReviews > 0) ...[
+                        const SizedBox(width: 2),
+                        Text(
+                          '(${store.totalReviews})',
+                          style: const TextStyle(
+                              fontSize: 11, color: Colors.black38),
+                        ),
+                      ],
                       const Spacer(),
                       _OpenBadge(open: store.effectivelyOpen),
                     ],

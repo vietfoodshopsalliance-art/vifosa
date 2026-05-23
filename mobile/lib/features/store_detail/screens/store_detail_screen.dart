@@ -33,15 +33,53 @@ class StoreDetailScreen extends ConsumerWidget {
               expandedHeight: 200,
               pinned: true,
               flexibleSpace: FlexibleSpaceBar(
-                background: store.coverImage != null && store.coverImage!.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: store.coverImage!,
-                        fit: BoxFit.cover,
-                      )
-                    : Container(
-                        color: theme.colorScheme.primary.withOpacity(0.3),
-                        child: const Icon(Icons.store, size: 72, color: Colors.white),
+                background: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Cover image
+                    store.coverImage != null && store.coverImage!.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: store.coverImage!,
+                            fit: BoxFit.cover,
+                          )
+                        : Container(
+                            color: theme.colorScheme.primary.withOpacity(0.3),
+                            child: const Icon(Icons.store,
+                                size: 72, color: Colors.white),
+                          ),
+                    // Avatar overlay — góc dưới bên trái
+                    if (store.avatarImage != null &&
+                        store.avatarImage!.isNotEmpty)
+                      Positioned(
+                        bottom: 12,
+                        left: 16,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border:
+                                Border.all(color: Colors.white, width: 2.5),
+                            boxShadow: const [
+                              BoxShadow(color: Colors.black26, blurRadius: 6)
+                            ],
+                          ),
+                          child: ClipOval(
+                            child: CachedNetworkImage(
+                              imageUrl: store.avatarImage!,
+                              width: 64,
+                              height: 64,
+                              fit: BoxFit.cover,
+                              errorWidget: (_, __, ___) => CircleAvatar(
+                                radius: 32,
+                                backgroundColor: Colors.grey.shade300,
+                                child: const Icon(Icons.store,
+                                    size: 28, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
+                  ],
+                ),
               ),
               actions: [
                 IconButton(
@@ -49,7 +87,9 @@ class StoreDetailScreen extends ConsumerWidget {
                     likedAsync.valueOrNull == true
                         ? Icons.favorite
                         : Icons.favorite_border,
-                    color: Colors.white,
+                    color: likedAsync.valueOrNull == true
+                        ? Colors.red
+                        : Colors.white,
                   ),
                   onPressed: () =>
                       ref.read(storeLikeProvider(storeId).notifier).toggle(),
@@ -88,21 +128,27 @@ class StoreDetailScreen extends ConsumerWidget {
                             const TextStyle(color: Colors.grey, fontSize: 14),
                       ),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        const Icon(Icons.star, color: Colors.amber, size: 18),
-                        const SizedBox(width: 4),
-                        Text(
-                          store.stats.avgRating.toStringAsFixed(1),
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '(${store.stats.totalReviews} đánh giá)',
-                          style: const TextStyle(
-                              color: Colors.grey, fontSize: 13),
-                        ),
-                      ],
+                    GestureDetector(
+                      onTap: () => _showReviews(context, ref, storeId),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.star, color: Colors.amber, size: 18),
+                          const SizedBox(width: 4),
+                          Text(
+                            store.stats.avgRating.toStringAsFixed(1),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '(${store.stats.totalReviews} đánh giá)',
+                            style: const TextStyle(
+                                color: Colors.grey, fontSize: 13),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.chevron_right,
+                              size: 16, color: Colors.grey),
+                        ],
+                      ),
                     ),
                     if (store.addressText.isNotEmpty) ...[
                       const SizedBox(height: 8),
@@ -117,6 +163,21 @@ class StoreDetailScreen extends ConsumerWidget {
                               style: const TextStyle(
                                   fontSize: 13, color: Colors.grey),
                             ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (store.phone != null && store.phone!.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.phone_outlined,
+                              size: 16, color: Colors.grey),
+                          const SizedBox(width: 4),
+                          Text(
+                            store.phone!,
+                            style: const TextStyle(
+                                fontSize: 13, color: Colors.grey),
                           ),
                         ],
                       ),

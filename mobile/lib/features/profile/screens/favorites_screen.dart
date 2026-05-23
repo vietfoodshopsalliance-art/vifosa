@@ -9,25 +9,7 @@ import '../../../core/models/menu_item.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/widgets/store_card.dart';
-
-// ---------------------------------------------------------------------------
-// Providers
-// ---------------------------------------------------------------------------
-final _favItemsProvider = FutureProvider<List<MenuItem>>((ref) async {
-  final res = await DioClient.instance.get(ApiEndpoints.favoriteItems);
-  final list = res.data is Map ? (res.data['items'] ?? res.data['data'] ?? []) : res.data;
-  return (list as List)
-      .map((e) => MenuItem.fromJson(e as Map<String, dynamic>))
-      .toList();
-});
-
-final _favStoresProvider = FutureProvider<List<Store>>((ref) async {
-  final res = await DioClient.instance.get(ApiEndpoints.favoriteStores);
-  final list = res.data is Map ? (res.data['stores'] ?? res.data['data'] ?? []) : res.data;
-  return (list as List)
-      .map((e) => Store.fromJson(e as Map<String, dynamic>))
-      .toList();
-});
+import '../../../core/providers/favorites_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -47,6 +29,12 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.invalidate(favItemsProvider);
+        ref.invalidate(favStoresProvider);
+      }
+    });
   }
 
   @override
@@ -83,7 +71,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen>
 class _FavItemsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final itemsAsync = ref.watch(_favItemsProvider);
+    final itemsAsync = ref.watch(favItemsProvider);
 
     return itemsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -98,7 +86,7 @@ class _FavItemsTab extends ConsumerWidget {
             item: items[i],
             onUnlike: () async {
               await _unlike(ref, items[i].likeId);
-              ref.invalidate(_favItemsProvider);
+              ref.invalidate(favItemsProvider);
             },
           ),
         );
@@ -201,7 +189,7 @@ class _FavItemTile extends StatelessWidget {
 class _FavStoresTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final storesAsync = ref.watch(_favStoresProvider);
+    final storesAsync = ref.watch(favStoresProvider);
 
     return storesAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -218,7 +206,7 @@ class _FavStoresTab extends ConsumerWidget {
             onUnlike: () async {
               await DioClient.instance
                   .delete(ApiEndpoints.likeDelete(stores[i].likeId ?? ''));
-              ref.invalidate(_favStoresProvider);
+              ref.invalidate(favStoresProvider);
             },
           ),
         );

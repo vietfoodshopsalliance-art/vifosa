@@ -130,6 +130,7 @@ class Store {
   final StoreStats stats;
   final double? distanceKm;
   final String? likeId;
+  final String? phone;
 
   const Store({
     required this.id,
@@ -151,6 +152,7 @@ class Store {
     required this.stats,
     this.distanceKm,
     this.likeId,
+    this.phone,
   });
 
   factory Store.fromJson(Map<String, dynamic> j) {
@@ -190,6 +192,7 @@ class Store {
           : const StoreStats(avgRating: 0, totalReviews: 0),
       distanceKm: (j['distanceKm'] as num?)?.toDouble(),
       likeId: j['likeId'] as String?,
+      phone: j['phone'] as String?,
     );
   }
 

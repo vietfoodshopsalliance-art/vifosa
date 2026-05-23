@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../models/category.dart';
 import '../models/store.dart' show StoreStatus;
@@ -44,7 +45,14 @@ class ItemCard extends ConsumerWidget {
     // open và preOrder đều cho thêm vào giỏ (preOrder bắt buộc CK, xử lý ở checkout)
     final canOrder = storeStatus != StoreStatus.emergencyClosed && item.isAvailable;
 
-    return Padding(
+    return GestureDetector(
+      onTap: () => context.push('/item-detail', extra: {
+        'item': item,
+        'storeId': storeId,
+        'storeName': storeName,
+        'storeStatus': storeStatus,
+      }),
+      child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -125,6 +133,7 @@ class ItemCard extends ConsumerWidget {
           else
             const SizedBox(width: 32),
         ],
+      ),
       ),
     );
   }
