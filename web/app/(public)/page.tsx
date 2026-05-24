@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import { LANDING } from '@/lib/landing-content'
 
 export const metadata: Metadata = {
-  title: 'Vifosa — Viet Food Shops Alliance',
+  title: 'Viet Shops — Viet Food Shops Alliance',
   description: LANDING.description !== 'ĐIỀN SAU' ? LANDING.description : 'Nền tảng kết nối quán ăn Việt Nam với thực khách.',
 }
 
@@ -13,7 +13,7 @@ export default function LandingPage() {
       {/* Navbar */}
       <header className="sticky top-0 z-30 border-b border-[#1D7A4E]/10 bg-[#1D7A4E]">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-          <span className="text-lg font-bold text-white">Vifosa</span>
+          <span className="text-lg font-bold text-white">Viet Shops</span>
           <div className="flex items-center gap-4">
             <Link href="/track" className="text-sm text-white/80 hover:text-white transition-colors">Tra cứu đơn</Link>
             <Link href="/login" className="rounded-lg bg-[#F5C842] px-4 py-1.5 text-sm font-semibold text-[#3D2800] hover:bg-[#D4A820] transition-colors">
@@ -36,7 +36,7 @@ export default function LandingPage() {
         <p className="mx-auto mb-8 max-w-xl text-lg text-[#6B5C3E]">
           {LANDING.description !== 'ĐIỀN SAU'
             ? LANDING.description
-            : 'Vifosa kết nối trực tiếp thực khách với các quán ăn địa phương. Không phí nền tảng, không trung gian, quán tự quản lý.'}
+            : 'Viet Shops kết nối trực tiếp thực khách với các quán ăn địa phương. Không phí nền tảng, không trung gian, quán tự quản lý.'}
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           <a
@@ -57,7 +57,7 @@ export default function LandingPage() {
       {/* Features */}
       <section className="bg-white py-16">
         <div className="mx-auto max-w-5xl px-4">
-          <h2 className="mb-10 text-center text-2xl font-bold text-[#1A1200]">Tại sao chọn Vifosa?</h2>
+          <h2 className="mb-10 text-center text-2xl font-bold text-[#1A1200]">Tại sao chọn Viet Shops?</h2>
           <div className="grid gap-6 sm:grid-cols-3">
             {LANDING.features[0].title !== 'ĐIỀN SAU'
               ? LANDING.features.map((f, i) => (
@@ -81,7 +81,7 @@ export default function LandingPage() {
           <h2 className="mb-10 text-2xl font-bold">Cách hoạt động</h2>
           <div className="grid gap-8 sm:grid-cols-3">
             {[
-              { step: '1', icon: '📱', title: 'Tải app', desc: 'Tải Vifosa trên Android, tạo tài khoản miễn phí.' },
+              { step: '1', icon: '📱', title: 'Tải app', desc: 'Tải Viet Shops trên Android, tạo tài khoản miễn phí.' },
               { step: '2', icon: '🔍', title: 'Tìm quán gần bạn', desc: 'App tự định vị, hiện các quán đang mở trong bán kính của bạn.' },
               { step: '3', icon: '🛵', title: 'Đặt & theo dõi', desc: 'Chọn món, xác nhận đơn, theo dõi trạng thái real-time.' },
             ].map(({ step, icon, title, desc }) => (
@@ -113,7 +113,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-5xl px-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="font-bold text-[#1D7A4E]">Vifosa</p>
+              <p className="font-bold text-[#1D7A4E]">Viet Shops</p>
               <p className="text-xs text-[#6B5C3E]">Viet Food Shops Alliance</p>
             </div>
             <div className="flex flex-wrap gap-4 text-sm text-[#6B5C3E]">

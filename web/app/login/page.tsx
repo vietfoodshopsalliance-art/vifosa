@@ -68,7 +68,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-[#FDFAF3] px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-[#1D7A4E]">Vifosa</h1>
+          <h1 className="text-3xl font-bold text-[#1D7A4E]">Viet Shops</h1>
           <p className="mt-1 text-sm text-[#6B5C3E]">Đăng nhập để quản lý</p>
         </div>
 
@@ -119,7 +119,7 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-6 text-center text-xs text-[#6B5C3E]">
-          Vifosa — Dành cho quản trị viên và chủ quán
+          Dành cho chủ quán quản lý cửa hàng và xem báo cáo
         </p>
       </div>
     </div>
