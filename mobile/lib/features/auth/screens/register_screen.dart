@@ -53,6 +53,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final isLoading = authState.status == AuthStatus.loading;
 
     ref.listen(authProvider, (_, next) {
+      if (next.status == AuthStatus.authenticated) {
+        context.go('/home');
+        return;
+      }
       if (next.status == AuthStatus.error && next.error != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -77,6 +81,27 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+
+                // Logo / title
+                Row(
+                  children: [
+                    Image.asset(
+                      'assets/images/vietshop_logo_notext.png',
+                      width: 36,
+                      height: 36,
+                      fit: BoxFit.contain,
+                    ),
+                    const SizedBox(width: 10),
+                    const Text('Viet Shops',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFF4B400),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
 
                 // Username — spec UA-4: unique, không đổi được
                 TextFormField(
@@ -188,7 +213,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 decoration: TextDecoration.underline,
                               ),
                             ),
-                            const TextSpan(text: ' của Vifosa'),
+                            const TextSpan(text: ' của Viet Shops'),
                           ])),
                         ),
                       ),
@@ -204,7 +229,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   child: ElevatedButton(
                     onPressed: isLoading ? null : _submit,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
+                      backgroundColor: const Color(0xFFF4B400),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
@@ -226,6 +251,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       child: const Text('Đăng nhập'),
                     ),
                   ],
+                ),
+                const SizedBox(height: 8),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: OutlinedButton.icon(
+                    onPressed: () => context.go('/home'),
+                    icon: const Icon(Icons.home_outlined),
+                    label: const Text('Vào trang chủ'),
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
                 ),
 
                 const SizedBox(height: 32),

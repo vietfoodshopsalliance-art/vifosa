@@ -42,25 +42,25 @@ class ShipFeeFormula {
   double calculate(double km) => (a + b * km) * (1 + c / 100);
 }
 
-class StoreStats {
+class OwnerStoreStats {
   final int completedOrdersThisMonth;
   final double avgRating;
   final int totalReviews;
 
-  StoreStats({
+  OwnerStoreStats({
     required this.completedOrdersThisMonth,
     required this.avgRating,
     required this.totalReviews,
   });
 
-  factory StoreStats.fromJson(Map<String, dynamic> json) => StoreStats(
+  factory OwnerStoreStats.fromJson(Map<String, dynamic> json) => OwnerStoreStats(
         completedOrdersThisMonth: json['completedOrdersThisMonth'] ?? 0,
         avgRating: (json['avgRating'] ?? 0).toDouble(),
         totalReviews: json['totalReviews'] ?? 0,
       );
 }
 
-enum StoreStatus { open, preorder, emergencyClosed, suspended }
+enum StoreStatus { open, preOrder, emergencyClosed, suspended }
 
 class StoreModel {
   final String id;
@@ -77,7 +77,7 @@ class StoreModel {
   final bool isSuspended;
   final bool isAdLockedByAdmin;
   final ShipFeeFormula shipFeeFormula;
-  final StoreStats stats;
+  final OwnerStoreStats stats;
 
   StoreModel({
     required this.id,
@@ -116,7 +116,7 @@ class StoreModel {
       isSuspended: json['isSuspended'] ?? false,
       isAdLockedByAdmin: json['isAdLockedByAdmin'] ?? false,
       shipFeeFormula: ShipFeeFormula.fromJson(json['shipFeeFormula'] ?? {}),
-      stats: StoreStats.fromJson(json['stats'] ?? {}),
+      stats: OwnerStoreStats.fromJson(json['stats'] ?? {}),
     );
   }
 
@@ -126,10 +126,10 @@ class StoreModel {
 
     final now = DateTime.now();
     final today = openingHours.where((h) => h.dayOfWeek == now.weekday % 7).firstOrNull;
-    if (today == null || today.isClosed) return StoreStatus.preorder;
+    if (today == null || today.isClosed) return StoreStatus.preOrder;
 
     final current = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
     if (current.compareTo(today.open) >= 0 && current.compareTo(today.close) <= 0) return StoreStatus.open;
-    return StoreStatus.preorder;
+    return StoreStatus.preOrder;
   }
 }

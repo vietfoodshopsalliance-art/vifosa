@@ -1,6 +1,7 @@
 // lib/features/favorites/favorites_screen.dart
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -29,12 +30,19 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        ref.invalidate(favItemsProvider);
-        ref.invalidate(favStoresProvider);
-      }
-    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final isCurrent = ModalRoute.of(context)?.isCurrent;
+    debugPrint('[FAV-DEBUG] FavScreen.didChangeDependencies isCurrent=$isCurrent');
+    // Refresh mỗi khi screen này trở thành route hiện tại (cả lần mở mới lẫn pop về từ store detail)
+    if (isCurrent == true) {
+      debugPrint('[FAV-DEBUG] FavScreen.invalidating both providers');
+      ref.invalidate(favItemsProvider);
+      ref.invalidate(favStoresProvider);
+    }
   }
 
   @override
@@ -73,10 +81,13 @@ class _FavItemsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final itemsAsync = ref.watch(favItemsProvider);
 
+    debugPrint('[FAV-DEBUG] _FavItemsTab.build state=${itemsAsync.runtimeType} hasValue=${itemsAsync.valueOrNull?.length}');
     return itemsAsync.when(
+      skipLoadingOnReload: true,
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Lỗi: $e')),
       data: (items) {
+        debugPrint('[FAV-DEBUG] _FavItemsTab.data rendering ${items.length} items');
         if (items.isEmpty) {
           return const _EmptyFavorites(message: 'Bạn chưa yêu thích món nào');
         }
@@ -191,10 +202,13 @@ class _FavStoresTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final storesAsync = ref.watch(favStoresProvider);
 
+    debugPrint('[FAV-DEBUG] _FavStoresTab.build state=${storesAsync.runtimeType} hasValue=${storesAsync.valueOrNull?.length}');
     return storesAsync.when(
+      skipLoadingOnReload: true,
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Lỗi: $e')),
       data: (stores) {
+        debugPrint('[FAV-DEBUG] _FavStoresTab.data rendering ${stores.length} stores');
         if (stores.isEmpty) {
           return const _EmptyFavorites(
               message: 'Bạn chưa yêu thích quán nào');

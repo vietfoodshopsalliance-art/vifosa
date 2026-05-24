@@ -11,6 +11,8 @@ import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/item_card.dart';
 import '../store_detail_provider.dart';
 import '../../cart/screens/cart_screen.dart' show cartProvider;
+import '../../auth/providers/auth_provider.dart';
+import '../../order/screens/guest_checkout_screen.dart' show GuestCheckoutArgs;
 
 class StoreDetailScreen extends ConsumerWidget {
   final String storeId;
@@ -281,7 +283,12 @@ class StoreDetailScreen extends ConsumerWidget {
         backgroundColor: Colors.red,
         alignment: AlignmentDirectional.topEnd,
         child: FloatingActionButton.extended(
-          onPressed: () => context.go('/cart'),
+          onPressed: () => _onCheckoutTap(
+            context,
+            ref,
+            storeId,
+            storeAsync.valueOrNull?.name ?? '',
+          ),
           icon: const Icon(Icons.shopping_cart),
           label: const Text('Xem giỏ hàng'),
         ),
@@ -305,6 +312,112 @@ class StoreDetailScreen extends ConsumerWidget {
       case StoreStatus.emergencyClosed: return const Color(0xFFF44336);
       case StoreStatus.suspended:       return const Color(0xFF9E9E9E);
     }
+  }
+
+  void _onCheckoutTap(
+    BuildContext context,
+    WidgetRef ref,
+    String storeId,
+    String storeName,
+  ) {
+    final isAuthenticated = ref.read(authProvider).isAuthenticated;
+    if (isAuthenticated) {
+      context.go('/cart');
+      return;
+    }
+
+    final cart = ref.read(cartProvider);
+    if (cart.isEmpty) {
+      // Không có gì để đặt → đưa về login
+      context.push('/login');
+      return;
+    }
+
+    _showCheckoutChoiceSheet(context, ref, storeId, storeName);
+  }
+
+  void _showCheckoutChoiceSheet(
+    BuildContext context,
+    WidgetRef ref,
+    String storeId,
+    String storeName,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Bạn muốn tiếp tục như thế nào?',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Đăng nhập để nhận ưu đãi thành viên và theo dõi đơn hàng dễ dàng hơn.',
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    context.push('/login');
+                  },
+                  icon: const Icon(Icons.login),
+                  label: const Text('Đăng nhập'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    final cart = ref.read(cartProvider);
+                    final guestItems = cart.items
+                        .map((i) => <String, dynamic>{
+                              'itemId': i.itemId,
+                              'name': i.name,
+                              'qty': i.quantity,
+                              'price': i.price,
+                            })
+                        .toList();
+                    context.push(
+                      '/guest-checkout',
+                      extra: GuestCheckoutArgs(
+                        storeId: cart.storeId ?? storeId,
+                        storeName: cart.storeName ?? storeName,
+                        items: guestItems,
+                      ),
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text('Tiếp tục không đăng nhập'),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _showReviews(BuildContext context, WidgetRef ref, String id) {

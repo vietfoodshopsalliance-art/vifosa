@@ -25,7 +25,8 @@ class ApiEndpoints {
   static const String myBankAccount       = '/me/bank-account';
   static const String myStores            = '/me/stores';
   static const String myStoreMemberships  = '/me/store-memberships';
-  static const String myReviews           = '/me/reviews';
+  static const String myReviews           = '/me/reviews-given';
+  static const String myReviewsReceived   = '/me/reviews';
   static const String myReviewsPending    = '/me/reviews/pending';
 
   // ── Stores ────────────────────────────────────────────────────────────────
@@ -116,10 +117,13 @@ class ApiEndpoints {
   static String orderReturnToPending(String id)   => '/orders/$id/return-to-pending';
 
   // ── Reviews ───────────────────────────────────────────────────────────────
-  static const String reviews           = '/reviews';
-  static String reviewById(String id)   => '/reviews/$id';
-  static String reviewReply(String id)  => '/reviews/$id/reply';
-  static String reviewImages(String id) => '/reviews/$id/images';
+  static const String reviews                                         = '/reviews';
+  static String reviewById(String id)                                 => '/reviews/$id';
+  static String reviewReply(String id)                                => '/reviews/$id/reply';
+  static String reviewImages(String id)                               => '/reviews/$id/images';
+  static String storeReviewReply(String storeId, String reviewId)    => '/stores/$storeId/reviews/$reviewId/reply';
+  static String orderCustomerReview(String orderId)                   => '/orders/$orderId/customer-review';
+  static String customerReviewReply(String reviewId)                  => '/reviews/$reviewId/customer-reply';
 
   // ── Likes / Favorites ─────────────────────────────────────────────────────
   static const String likes            = '/likes';
@@ -158,12 +162,25 @@ class ApiEndpoints {
   static const String notifReadAll             = '/me/notifications/read-all';
   static String notifRead(String id)           => '/me/notifications/$id/read';
 
+  // ── Guest orders & public tracking ──────────────────────────────────────────
+  static const String guestOrders = '/guest/orders';
+  static const String publicTrack = '/track';
+
   // ── Home feed / Search ────────────────────────────────────────────────────
   static const String homeFeed = '/home-feed';
   static const String search   = '/search';
 
   // ── User profile (public) ────────────────────────────────────────────────
   static String userProfile(String username) => '/users/$username';
+
+  // ── Privacy ───────────────────────────────────────────────────────────────
+  static const String myPrivacy = '/me/privacy';
+
+  // ── Customer profile (store owner view) ──────────────────────────────────
+  static String storeCustomerProfile(String storeId, String customerId) =>
+      '/me/stores/$storeId/customers/$customerId';
+  static String storeCustomerReviews(String storeId, String customerId) =>
+      '/me/stores/$storeId/customers/$customerId/reviews';
 
   // ── VIP — Customer ───────────────────────────────────────────────────────
   static const String customerVipPlans        = '/vip/customer/plans';

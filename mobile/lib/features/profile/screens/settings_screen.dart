@@ -43,6 +43,12 @@ class SettingsScreen extends ConsumerWidget {
           const Divider(height: 16),
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Text('Quyền riêng tư', style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.w600)),
+          ),
+          const _PrivacySection(),
+          const Divider(height: 16),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: Text('Tài khoản', style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.w600)),
           ),
           ListTile(
@@ -77,6 +83,112 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 }
+
+// ─── Privacy section ──────────────────────────────────────────────────────────
+
+class _PrivacySection extends StatefulWidget {
+  const _PrivacySection();
+
+  @override
+  State<_PrivacySection> createState() => _PrivacySectionState();
+}
+
+class _PrivacySectionState extends State<_PrivacySection> {
+  bool _showPhone     = false;
+  bool _showAddress   = false;
+  bool _showFavorites = false;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrivacy();
+  }
+
+  Future<void> _loadPrivacy() async {
+    try {
+      final res = await DioClient.instance.get(ApiEndpoints.me);
+      final privacy = (res.data as Map?)?['privacy'] as Map?;
+      if (privacy != null && mounted) {
+        setState(() {
+          _showPhone     = privacy['showPhone']     as bool? ?? false;
+          _showAddress   = privacy['showAddress']   as bool? ?? false;
+          _showFavorites = privacy['showFavorites'] as bool? ?? false;
+          _loaded = true;
+        });
+      } else {
+        setState(() => _loaded = true);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loaded = true);
+    }
+  }
+
+  Future<void> _update(String field, bool value) async {
+    try {
+      await DioClient.instance.patch(
+        ApiEndpoints.myPrivacy,
+        data: {field: value},
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+        // Revert
+        _loadPrivacy();
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loaded) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Center(child: SizedBox(
+          width: 20, height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        )),
+      );
+    }
+    return Column(
+      children: [
+        SwitchListTile(
+          title: const Text('Hiện số điện thoại'),
+          subtitle: const Text('Chủ quán xem được SĐT trên trang hồ sơ của bạn',
+              style: TextStyle(fontSize: 12)),
+          value: _showPhone,
+          onChanged: (v) {
+            setState(() => _showPhone = v);
+            _update('showPhone', v);
+          },
+        ),
+        SwitchListTile(
+          title: const Text('Hiện địa chỉ'),
+          subtitle: const Text('Chủ quán xem được địa chỉ mặc định của bạn',
+              style: TextStyle(fontSize: 12)),
+          value: _showAddress,
+          onChanged: (v) {
+            setState(() => _showAddress = v);
+            _update('showAddress', v);
+          },
+        ),
+        SwitchListTile(
+          title: const Text('Hiện danh sách yêu thích'),
+          subtitle: const Text('Chủ quán xem được món và quán bạn đã thích',
+              style: TextStyle(fontSize: 12)),
+          value: _showFavorites,
+          onChanged: (v) {
+            setState(() => _showFavorites = v);
+            _update('showFavorites', v);
+          },
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Notif toggle ─────────────────────────────────────────────────────────────
 
 class _NotifToggle extends StatefulWidget {
   final String title;

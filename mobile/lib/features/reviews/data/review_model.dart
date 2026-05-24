@@ -1,103 +1,152 @@
-// mobile/lib/features/reviews/data/review_model.dart
+// lib/features/reviews/data/review_model.dart
 
-class ReviewReply {
+class MyReviewReply {
   final String text;
   final DateTime at;
   final DateTime? editedAt;
 
-  ReviewReply({required this.text, required this.at, this.editedAt});
+  const MyReviewReply({required this.text, required this.at, this.editedAt});
 
-  factory ReviewReply.fromJson(Map<String, dynamic> json) => ReviewReply(
+  factory MyReviewReply.fromJson(Map<String, dynamic> json) => MyReviewReply(
         text: json['text'] as String,
         at: DateTime.parse(json['at'] as String),
-        editedAt: json['editedAt'] != null ? DateTime.parse(json['editedAt'] as String) : null,
+        editedAt: json['editedAt'] != null
+            ? DateTime.parse(json['editedAt'] as String)
+            : null,
       );
 }
 
-class ReviewAuthor {
-  final String nickname;
-  final String? avatar;
-
-  ReviewAuthor({required this.nickname, this.avatar});
-
-  factory ReviewAuthor.fromJson(Map<String, dynamic> json) => ReviewAuthor(
-        nickname: json['nickname'] as String,
-        avatar: json['avatar'] as String?,
-      );
-}
-
-class Review {
+// Review tôi đã viết cho quán (toEntityType: 'store')
+class MyReview {
   final String id;
   final String orderId;
+  final String? orderCode;
+  final String? storeName;
+  final String? storeAvatarUrl;
+  final String? storeId;
   final int stars;
   final String comment;
   final List<String> images;
   final bool isAnonymous;
-  final ReviewAuthor? author;
-  final ReviewReply? reply;
+  final MyReviewReply? reply;
   final DateTime createdAt;
   final DateTime? editedAt;
-  final Map<String, dynamic>? orderInfo;
 
-  Review({
+  const MyReview({
     required this.id,
     required this.orderId,
+    this.orderCode,
+    this.storeName,
+    this.storeAvatarUrl,
+    this.storeId,
     required this.stars,
     required this.comment,
     required this.images,
     required this.isAnonymous,
-    this.author,
     this.reply,
     required this.createdAt,
     this.editedAt,
-    this.orderInfo,
   });
 
-  factory Review.fromJson(Map<String, dynamic> json) => Review(
-        id: json['_id'] as String,
-        orderId: json['orderId'] as String,
-        stars: json['stars'] as int,
-        comment: json['comment'] as String? ?? '',
-        images: List<String>.from(json['images'] ?? []),
-        isAnonymous: json['isAnonymous'] as bool? ?? false,
-        author: json['author'] != null ? ReviewAuthor.fromJson(json['author']) : null,
-        reply: json['reply'] != null ? ReviewReply.fromJson(json['reply']) : null,
-        createdAt: DateTime.parse(json['createdAt'] as String),
-        editedAt: json['editedAt'] != null ? DateTime.parse(json['editedAt'] as String) : null,
-        orderInfo: json['orderInfo'] as Map<String, dynamic>?,
-      );
-
-  bool get canEdit => DateTime.now().difference(createdAt).inHours < 24;
-  bool get canDelete => DateTime.now().difference(createdAt).inHours < 24;
-}
-
-class StoreReviewsResult {
-  final List<Review> data;
-  final double avgRating;
-  final int totalReviews;
-  final Map<String, int> distribution;
-  final int page;
-  final bool hasMore;
-
-  StoreReviewsResult({
-    required this.data,
-    required this.avgRating,
-    required this.totalReviews,
-    required this.distribution,
-    required this.page,
-    required this.hasMore,
-  });
-
-  factory StoreReviewsResult.fromJson(Map<String, dynamic> json) {
-    final stats = json['stats'] as Map<String, dynamic>;
-    final dist = (stats['distribution'] as Map<String, dynamic>?) ?? {};
-    return StoreReviewsResult(
-      data: (json['data'] as List).map((e) => Review.fromJson(e)).toList(),
-      avgRating: (stats['avgRating'] as num).toDouble(),
-      totalReviews: stats['totalReviews'] as int,
-      distribution: dist.map((k, v) => MapEntry(k, v as int)),
-      page: json['page'] as int,
-      hasMore: json['hasMore'] as bool,
+  factory MyReview.fromJson(Map<String, dynamic> json) {
+    final store = json['toEntityId'] as Map<String, dynamic>?;
+    final rawOrder = json['orderId'];
+    final orderMap = rawOrder is Map<String, dynamic> ? rawOrder : null;
+    return MyReview(
+      id: json['_id'] as String? ?? '',
+      orderId: orderMap?['_id'] as String? ?? (rawOrder is String ? rawOrder : ''),
+      orderCode: orderMap?['code'] as String?,
+      storeName: store?['name'] as String?,
+      storeAvatarUrl: store?['avatarImage'] as String?,
+      storeId: store?['_id'] as String?,
+      stars: (json['stars'] as num?)?.toInt() ?? 0,
+      comment: json['comment'] as String? ?? '',
+      images: ((json['images'] as List?) ?? []).cast<String>(),
+      isAnonymous: json['isAnonymous'] as bool? ?? false,
+      reply: json['reply'] != null
+          ? MyReviewReply.fromJson(json['reply'] as Map<String, dynamic>)
+          : null,
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+      editedAt: json['editedAt'] != null
+          ? DateTime.tryParse(json['editedAt'] as String)
+          : null,
     );
   }
+
+  // Rolling 24h: author có thể sửa/xóa nếu còn trong 24h kể từ lần reply cuối
+  DateTime get _authorDeadline {
+    final base = reply?.editedAt ?? reply?.at ?? createdAt;
+    return base.add(const Duration(hours: 24));
+  }
+
+  bool get canEdit   => DateTime.now().isBefore(_authorDeadline);
+  bool get canDelete => DateTime.now().isBefore(_authorDeadline);
+}
+
+// Review tôi nhận về từ chủ quán (toEntityType: 'customer')
+class ReceivedReview {
+  final String id;
+  final String orderId;
+  final String? orderCode;
+  final String? fromNickname;
+  final String? fromAvatar;
+  final String? fromUserId;
+  final bool isAnonymous;
+  final int stars;
+  final String comment;
+  final List<String> images;
+  final MyReviewReply? myReply;  // phản hồi của tôi (customer)
+  final DateTime createdAt;
+  final DateTime? editedAt;
+
+  const ReceivedReview({
+    required this.id,
+    required this.orderId,
+    this.orderCode,
+    this.fromNickname,
+    this.fromAvatar,
+    this.fromUserId,
+    required this.isAnonymous,
+    required this.stars,
+    required this.comment,
+    required this.images,
+    this.myReply,
+    required this.createdAt,
+    this.editedAt,
+  });
+
+  factory ReceivedReview.fromJson(Map<String, dynamic> json) {
+    final rawOrder = json['orderId'];
+    final orderMap = rawOrder is Map<String, dynamic> ? rawOrder : null;
+    final rawFromUser = json['fromUserId'];
+    final fromUserMap = rawFromUser is Map<String, dynamic> ? rawFromUser : null;
+    return ReceivedReview(
+      id: json['_id'] as String? ?? '',
+      orderId: orderMap?['_id'] as String? ?? (rawOrder is String ? rawOrder : ''),
+      orderCode: orderMap?['code'] as String? ?? json['orderCode'] as String?,
+      fromNickname: json['isAnonymous'] == true ? null : (fromUserMap?['nickname'] as String? ?? json['nickname'] as String?),
+      fromAvatar:   json['isAnonymous'] == true ? null : (fromUserMap?['avatar'] as String? ?? json['avatar'] as String?),
+      fromUserId:   json['isAnonymous'] == true ? null : (fromUserMap?['_id'] as String? ?? (rawFromUser is String ? rawFromUser : null)),
+      isAnonymous: json['isAnonymous'] as bool? ?? false,
+      stars: (json['stars'] as num?)?.toInt() ?? 0,
+      comment: json['comment'] as String? ?? '',
+      images: ((json['images'] as List?) ?? []).cast<String>(),
+      myReply: json['reply'] != null
+          ? MyReviewReply.fromJson(json['reply'] as Map<String, dynamic>)
+          : null,
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+      editedAt: json['editedAt'] != null
+          ? DateTime.tryParse(json['editedAt'] as String)
+          : null,
+    );
+  }
+
+  // Rolling 24h: tôi (customer) có thể reply nếu còn trong 24h kể từ lần quán sửa cuối
+  DateTime get _replyDeadline {
+    final base = editedAt ?? createdAt;
+    return base.add(const Duration(hours: 24));
+  }
+
+  bool get canReply      => DateTime.now().isBefore(_replyDeadline);
+  bool get canEditReply  => myReply != null && canReply;
 }

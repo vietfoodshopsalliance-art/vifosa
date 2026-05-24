@@ -4,7 +4,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 
-export 'status_badge.dart';
 export 'app_avatar.dart';
 export 'section_header.dart';
 export 'role_switcher_dropdown.dart';

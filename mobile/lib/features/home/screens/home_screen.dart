@@ -40,7 +40,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final radius    = ref.watch(selectedRadiusProvider);
     final authState = ref.watch(authProvider);
     final isAuth    = authState.isAuthenticated;
     final user      = authState.user;
@@ -63,16 +62,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               title: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.restaurant_menu,
-                      color: Color(0xFFE53935), size: 22),
-                  const SizedBox(width: 6),
-                  const Text(
-                    'Vifosa',
-                    style: TextStyle(
-                      color: Color(0xFFE53935),
-                      fontWeight: FontWeight.w800,
-                      fontSize: 20,
-                    ),
+                  Image.asset(
+                    'assets/images/vietshop_logo_ngang.png',
+                    height: 14,
+                    fit: BoxFit.contain,
                   ),
                   const SizedBox(width: 10),
                   // Issue 3 & 6: Search button trái
@@ -91,14 +84,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ],
               ),
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.notifications_outlined,
-                      color: Colors.black87),
-                  tooltip: 'Thông báo',
-                  onPressed: () => context.push('/notifications'),
-                ),
-                // Issue 4 & 5: Avatar cho tất cả user đã đăng nhập
+                if (isAuth)
+                  IconButton(
+                    icon: const Icon(Icons.notifications_outlined,
+                        color: Colors.black87),
+                    tooltip: 'Thông báo',
+                    onPressed: () => context.push('/notifications'),
+                  ),
                 if (isAuth) _AvatarMenuButton(user: user),
+                if (!isAuth)
+                  TextButton(
+                    onPressed: () => context.push('/login'),
+                    child: const Text(
+                      'Đăng nhập',
+                      style: TextStyle(
+                        color: Color(0xFFF4B400),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
                 const SizedBox(width: 4),
               ],
             ),
@@ -108,13 +113,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             // ── Section 1: Quán mới ───────────────────────────────────
             _SectionSliver(
               title: 'Quán mới',
-              provider: newStoresProvider(radius),
+              provider: newStoresProvider,
             ),
 
             // ── Section 3: Bán chạy ───────────────────────────────────
             _SectionSliver(
               title: 'Bán chạy 30 ngày',
-              provider: popularStoresProvider(radius),
+              provider: popularStoresProvider,
             ),
 
             // ── Section 4: Đã mua gần đây (logged-in) ────────────────

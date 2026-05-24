@@ -47,7 +47,8 @@ class AuthRepository {
 
   Future<Map<String, dynamic>> getMe() async {
     final res = await _dio.get(ApiEndpoints.me);
-    return res.data['data'] as Map<String, dynamic>;
+    // /me trả về user trực tiếp (không wrap { data: ... })
+    return res.data as Map<String, dynamic>;
   }
 
   Future<void> saveFcmToken(String token) async {

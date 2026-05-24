@@ -63,7 +63,7 @@ class _StatusBanner extends StatelessWidget {
     final status = store.status;
     final config = {
       StoreStatus.open: ('Đang mở cửa', Colors.green, Icons.check_circle),
-      StoreStatus.preorder: ('Ngoài giờ mở — Đặt trước', Colors.blue, Icons.access_time),
+      StoreStatus.preOrder: ('Ngoài giờ mở — Đặt trước', Colors.blue, Icons.access_time),
       StoreStatus.emergencyClosed: ('Tạm đóng khẩn cấp', Colors.orange, Icons.warning),
       StoreStatus.suspended: ('Tài khoản bị khoá', Colors.red, Icons.block),
     }[status]!;

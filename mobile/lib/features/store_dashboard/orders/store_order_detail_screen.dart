@@ -3,6 +3,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../../core/network/dio_client.dart';
@@ -11,11 +12,13 @@ import '../../../core/services/image_service.dart'
     show ImageUploadContext, imageServiceProvider;
 import '../../../core/widgets/order_code_text.dart';
 import '../models/store_order.dart';
+import '../reviews/customer_review_dialog.dart';
 
 final _currency = NumberFormat('#,##0', 'vi_VN');
 
 class StoreOrderDetailScreen extends ConsumerStatefulWidget {
   final StoreOrder order;
+  final String? storeId;
   /// null = history / read-only view
   final VoidCallback? onDeliver;
   final VoidCallback? onReturnToPending;
@@ -24,6 +27,7 @@ class StoreOrderDetailScreen extends ConsumerStatefulWidget {
   const StoreOrderDetailScreen({
     super.key,
     required this.order,
+    this.storeId,
     this.onDeliver,
     this.onReturnToPending,
     this.onRecordPayment,
@@ -39,11 +43,55 @@ class _StoreOrderDetailScreenState
   bool _uploading = false;
   late List<String> _foodPhotos;
 
+  // Review state
+  Map<String, dynamic>? _orderReviews;
+  bool _reviewLoading = false;
+
   @override
   void initState() {
     super.initState();
     _foodPhotos = List<String>.from(widget.order.foodPhotos);
     _refreshFoodPhotos();
+    _fetchOrderReviews();
+  }
+
+  Future<void> _fetchOrderReviews() async {
+    if (widget.storeId == null) return;
+    final o = widget.order;
+    if (!['delivered', 'completed'].contains(o.mainStatus)) return;
+    setState(() => _reviewLoading = true);
+    try {
+      final res = await DioClient.instance.get(ApiEndpoints.orderReviews(o.id));
+      if (mounted) setState(() => _orderReviews = res.data as Map<String, dynamic>);
+    } catch (_) {
+      // ignore — button simply won't show
+    } finally {
+      if (mounted) setState(() => _reviewLoading = false);
+    }
+  }
+
+  bool get _canReviewCustomer =>
+      _orderReviews != null && (_orderReviews!['canReviewCustomer'] as bool? ?? false);
+
+  Map<String, dynamic>? get _existingCustomerReview =>
+      _orderReviews?['customerReview'] as Map<String, dynamic>?;
+
+  Future<void> _submitCustomerReview({
+    required int stars,
+    required String comment,
+    required List<String> images,
+    required bool isAnonymous,
+  }) async {
+    await DioClient.instance.post(
+      ApiEndpoints.orderCustomerReview(widget.order.id),
+      data: {
+        'stars': stars,
+        'comment': comment,
+        'images': images,
+        'isAnonymous': isAnonymous,
+      },
+    );
+    await _fetchOrderReviews();
   }
 
   Future<void> _refreshFoodPhotos() async {
@@ -137,6 +185,18 @@ class _StoreOrderDetailScreenState
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // ── Customer info ────────────────────────────────────────────
+          if (widget.storeId != null &&
+              o.customerId != null &&
+              o.customerId!.isNotEmpty) ...[
+            _CustomerCard(
+              storeId: widget.storeId!,
+              customerId: o.customerId!,
+              recipientName: o.recipientName,
+            ),
+            const SizedBox(height: 12),
+          ],
+
           // ── Status ──────────────────────────────────────────────────
           _Section(
             child: Column(
@@ -280,6 +340,39 @@ class _StoreOrderDetailScreenState
             const SizedBox(height: 12),
           ],
 
+          // ── Customer review ───────────────────────────────────────────
+          if (widget.storeId != null &&
+              o.customerId != null &&
+              o.customerId!.isNotEmpty &&
+              ['delivered', 'completed'].contains(o.mainStatus)) ...[
+            _Section(
+              title: 'Đánh giá khách hàng',
+              child: _reviewLoading
+                  ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                  : _existingCustomerReview != null
+                      ? _ExistingCustomerReview(review: _existingCustomerReview!)
+                      : _canReviewCustomer
+                          ? SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.star_border, size: 18),
+                                label: const Text('Đánh giá khách hàng'),
+                                onPressed: () => showDialog(
+                                  context: context,
+                                  builder: (_) => CustomerReviewDialog(
+                                    onSubmit: _submitCustomerReview,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : const Text(
+                              'Không thể đánh giá (đã quá 30 ngày)',
+                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
           // ── Actions ───────────────────────────────────────────────────
           if (widget.onDeliver != null || widget.onReturnToPending != null) ...[
             if (widget.onReturnToPending != null)
@@ -361,6 +454,91 @@ class _StoreOrderDetailScreenState
           ],
         ),
       );
+}
+
+// ─── Existing customer review summary ────────────────────────────────────────
+
+class _ExistingCustomerReview extends StatelessWidget {
+  final Map<String, dynamic> review;
+  const _ExistingCustomerReview({required this.review});
+
+  @override
+  Widget build(BuildContext context) {
+    final stars = (review['stars'] as num?)?.toInt() ?? 0;
+    final comment = review['comment'] as String? ?? '';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            ...List.generate(5, (i) => Icon(
+              i < stars ? Icons.star_rounded : Icons.star_outline_rounded,
+              size: 18,
+              color: i < stars ? Colors.amber : Colors.grey.shade300,
+            )),
+            const SizedBox(width: 6),
+            const Text('Đã đánh giá', style: TextStyle(fontSize: 12, color: Colors.green)),
+          ],
+        ),
+        if (comment.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(comment, style: const TextStyle(fontSize: 13)),
+        ],
+      ],
+    );
+  }
+}
+
+// ─── Customer card ────────────────────────────────────────────────────────────
+
+class _CustomerCard extends StatelessWidget {
+  final String storeId;
+  final String customerId;
+  final String? recipientName;
+  const _CustomerCard({
+    required this.storeId,
+    required this.customerId,
+    this.recipientName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => context.push(
+          '/store-dashboard/$storeId/customers/$customerId'),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.person_outline, size: 20, color: Colors.blueGrey),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Khách hàng',
+                      style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  if (recipientName != null)
+                    Text(recipientName!,
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w500)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, size: 18, color: Colors.grey),
+            const Text('Xem hồ sơ',
+                style: TextStyle(fontSize: 12, color: Colors.blueGrey)),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _Section extends StatelessWidget {

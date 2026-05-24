@@ -63,16 +63,28 @@ dev_dependencies:
   hive_generator: ^2.0.1
   build_runner: ^2.4.9
   flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.1
 
 flutter_launcher_icons:
-  android: true
-  ios: true
-  image_path: "assets/images/app_icon_solid.png"
+  android: "launcher_icon"
   adaptive_icon_background: "#F4B400"
   adaptive_icon_foreground: "assets/images/app_icon.png"
+  ios: true
+  image_path: "assets/images/app_icon_solid.png"
+  remove_alpha_ios: true
   min_sdk_android: 21
   web:
     generate: false
+
+flutter_native_splash:
+  color: "#F4B400"
+  image: assets/images/splash_logo.png
+  color_dark: "#F4B400"
+  image_dark: assets/images/splash_logo.png
+  android_12:
+    color: "#F4B400"
+    image: assets/images/splash_logo.png
+    icon_background_color: "#F4B400"
 
 flutter:
   uses-material-design: true

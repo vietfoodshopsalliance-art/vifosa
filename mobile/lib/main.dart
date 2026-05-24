@@ -3,25 +3,38 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/providers/auth_provider.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Hive.initFlutter();
-
-  // Bắt tất cả lỗi Flutter framework
-  FlutterError.onError = (details) {
-    debugPrint('══ FlutterError ══');
-    debugPrint('${details.exceptionAsString()}');
-    debugPrint('${details.stack}');
-  };
-
+void main() {
+  // runZonedGuarded phải bọc toàn bộ — kể cả ensureInitialized —
+  // để binding và runApp cùng nằm trong một zone, tránh "Zone mismatch".
   runZonedGuarded(
     () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      await Hive.initFlutter();
+
+      // Preload splash image vào cache trước khi runApp
+      final splashCompleter = Completer<void>();
+      const AssetImage('assets/images/splash_logo.png')
+          .resolve(ImageConfiguration.empty)
+          .addListener(ImageStreamListener(
+            (_, __) { if (!splashCompleter.isCompleted) splashCompleter.complete(); },
+            onError: (_, __) { if (!splashCompleter.isCompleted) splashCompleter.complete(); },
+          ));
+      await splashCompleter.future;
+
+      // Bắt tất cả lỗi Flutter framework
+      FlutterError.onError = (details) {
+        debugPrint('══ FlutterError ══');
+        debugPrint('${details.exceptionAsString()}');
+        debugPrint('${details.stack}');
+      };
+
       final container = ProviderContainer();
       container.read(authProvider);
       container.read(appRouterProvider);

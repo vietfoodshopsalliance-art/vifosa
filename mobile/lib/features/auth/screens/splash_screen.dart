@@ -14,24 +14,37 @@ class SplashScreen extends ConsumerStatefulWidget {
 
 class _SplashScreenState extends ConsumerState<SplashScreen> {
   bool _navigated = false;
+  bool _minTimeElapsed = false;
+  AuthStatus? _pendingStatus;
 
   void _navigate(AuthStatus status) {
     if (_navigated || !mounted) return;
-    _navigated = true;
-    if (status == AuthStatus.authenticated) {
-      context.go('/home');
-    } else {
-      context.go('/login');
+    // Chờ đủ thời gian tối thiểu mới navigate
+    if (!_minTimeElapsed) {
+      _pendingStatus = status;
+      return;
     }
+    _navigated = true;
+    context.go('/home');
   }
 
   @override
   void initState() {
     super.initState();
 
+    // Thời gian tối thiểu 2 giây để logo hiển thị
+    Future.delayed(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      _minTimeElapsed = true;
+      if (_pendingStatus != null) {
+        _navigate(_pendingStatus!);
+      }
+    });
+
     // Safety timer — 6s fallback
     Future.delayed(const Duration(seconds: 6), () {
       if (!_navigated && mounted) {
+        _minTimeElapsed = true;
         final status = ref.read(authProvider).status;
         _navigate(status == AuthStatus.authenticated
             ? AuthStatus.authenticated
@@ -39,7 +52,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       }
     });
 
-    // Check ngay sau frame đầu — bắt case auth đã resolve trước khi listen gắn
+    // Check ngay sau frame đầu
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final status = ref.read(authProvider).status;
       if (status != AuthStatus.loading) {
@@ -50,27 +63,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Listen để bắt case auth resolve SAU khi widget mount
     ref.listen<AuthState>(authProvider, (_, next) {
       if (next.status != AuthStatus.loading) {
         _navigate(next.status);
       }
     });
 
-    return const Scaffold(
-      backgroundColor: Color(0xFFF4B400),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4B400),
       body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image(
-              image: AssetImage('assets/images/app_icon.png'),
-              width: 200,
-              height: 200,
-            ),
-            SizedBox(height: 40),
-            CircularProgressIndicator(color: Colors.white),
-          ],
+        child: Image.asset(
+          'assets/images/splash_logo.png',
+          width: 120,
+          fit: BoxFit.contain,
         ),
       ),
     );

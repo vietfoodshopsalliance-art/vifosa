@@ -1,5 +1,6 @@
 // lib/features/store_detail/store_detail_provider.dart
 
+import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/store.dart';
 import '../../core/models/category.dart';
@@ -54,6 +55,7 @@ class StoreLikeNotifier extends StateNotifier<AsyncValue<bool>> {
   final Ref _ref;
   final String storeId;
   String? _likeId;
+  bool _inFlight = false;
 
   StoreLikeNotifier({
     required Ref ref,
@@ -64,7 +66,10 @@ class StoreLikeNotifier extends StateNotifier<AsyncValue<bool>> {
         super(AsyncValue.data(initialLikeId != null));
 
   Future<void> toggle() async {
+    if (_inFlight) return;
+    _inFlight = true;
     final current = state.valueOrNull ?? false;
+    debugPrint('[FAV-DEBUG] StoreLike.toggle storeId=$storeId current=$current _likeId=$_likeId');
     state = const AsyncValue.loading();
     try {
       if (!current) {
@@ -74,16 +79,26 @@ class StoreLikeNotifier extends StateNotifier<AsyncValue<bool>> {
         );
         _likeId = res.data['id']?.toString();
         state = const AsyncValue.data(true);
+        debugPrint('[FAV-DEBUG] StoreLike.LIKED new _likeId=$_likeId');
       } else {
         if (_likeId != null) {
+          debugPrint('[FAV-DEBUG] StoreLike.DELETE /likes/$_likeId');
           await DioClient.instance.delete(ApiEndpoints.likeDelete(_likeId!));
           _likeId = null;
+          debugPrint('[FAV-DEBUG] StoreLike.DELETE OK');
+        } else {
+          debugPrint('[FAV-DEBUG] StoreLike.UNLIKE but _likeId is NULL — delete skipped!');
         }
         state = const AsyncValue.data(false);
       }
+      debugPrint('[FAV-DEBUG] StoreLike.invalidate(favStoresProvider)');
       _ref.invalidate(favStoresProvider);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
+    } catch (e, _) {
+      debugPrint('[FAV-DEBUG] StoreLike.toggle ERROR: $e');
+      state = AsyncValue.data(current); // revert về trạng thái trước
+      _ref.invalidate(favStoresProvider); // sync lại với server
+    } finally {
+      _inFlight = false;
     }
   }
 }
@@ -193,6 +208,7 @@ class ItemLikeNotifier extends StateNotifier<AsyncValue<bool>> {
   final Ref _ref;
   final String itemId;
   String? _likeId;
+  bool _inFlight = false;
 
   ItemLikeNotifier({required Ref ref, required this.itemId, String? initialLikeId})
       : _ref = ref,
@@ -200,7 +216,10 @@ class ItemLikeNotifier extends StateNotifier<AsyncValue<bool>> {
         super(AsyncValue.data(initialLikeId != null));
 
   Future<void> toggle() async {
+    if (_inFlight) return;
+    _inFlight = true;
     final current = state.valueOrNull ?? false;
+    debugPrint('[FAV-DEBUG] ItemLike.toggle itemId=$itemId current=$current _likeId=$_likeId');
     state = const AsyncValue.loading();
     try {
       if (!current) {
@@ -210,16 +229,26 @@ class ItemLikeNotifier extends StateNotifier<AsyncValue<bool>> {
         );
         _likeId = res.data['id']?.toString();
         state = const AsyncValue.data(true);
+        debugPrint('[FAV-DEBUG] ItemLike.LIKED new _likeId=$_likeId');
       } else {
         if (_likeId != null) {
+          debugPrint('[FAV-DEBUG] ItemLike.DELETE /likes/$_likeId');
           await DioClient.instance.delete(ApiEndpoints.likeDelete(_likeId!));
           _likeId = null;
+          debugPrint('[FAV-DEBUG] ItemLike.DELETE OK');
+        } else {
+          debugPrint('[FAV-DEBUG] ItemLike.UNLIKE but _likeId is NULL — delete skipped!');
         }
         state = const AsyncValue.data(false);
       }
+      debugPrint('[FAV-DEBUG] ItemLike.invalidate(favItemsProvider)');
       _ref.invalidate(favItemsProvider);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
+    } catch (e, _) {
+      debugPrint('[FAV-DEBUG] ItemLike.toggle ERROR: $e');
+      state = AsyncValue.data(current); // revert về trạng thái trước
+      _ref.invalidate(favItemsProvider); // sync lại với server
+    } finally {
+      _inFlight = false;
     }
   }
 }

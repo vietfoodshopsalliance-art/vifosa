@@ -1,6 +1,7 @@
 // lib/features/store_dashboard/settings/store_settings_screen.dart
 
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -121,9 +122,7 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
       final res = await DioClient.instance.get(ApiEndpoints.myStoreById(widget.storeId));
       final raw = res.data as Map<String, dynamic>;
       final d = (raw['store'] ?? raw) as Map<String, dynamic>;
-            debugPrint('=== LOAD store data: $d');
-      
-            setState(() {
+      setState(() {
         _nameCtrl.text = d['name'] as String? ?? '';
         _descCtrl.text = d['description'] as String? ?? '';
         final addr = d['address'] as Map? ?? {};
@@ -174,7 +173,12 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
         _initialLoaded = true;
       });
 
-    } catch (_) {
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không tải được cài đặt: $e')),
+        );
+      }
       setState(() => _initialLoaded = true);
     }
   }
@@ -201,9 +205,7 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
         coverUrl = result.url;
       }
 
-      final dio = ref.read(dioClientProvider);
-
-      await dio.dio.patch(
+      await DioClient.instance.patch(
         ApiEndpoints.myStoreById(widget.storeId),
         data: {
           'name': _nameCtrl.text.trim(),
@@ -252,8 +254,18 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+        String msg = 'Lỗi khi lưu cài đặt';
+        if (e is DioException) {
+          final body = e.response?.data;
+          if (body is Map && body['error'] != null) {
+            msg = body['error'].toString();
+          } else if (body is Map && body['message'] != null) {
+            msg = body['message'].toString();
+          } else {
+            msg = 'Lỗi ${e.response?.statusCode ?? ""}';
+          }
+        }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       }
     } finally {
       if (mounted) setState(() => _loading = false);

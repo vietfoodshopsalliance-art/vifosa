@@ -63,7 +63,6 @@ class _ReviewFormScreenState extends ConsumerState<ReviewFormScreen> {
       final repo = ref.read(reviewRepositoryProvider);
       await repo.createReview(
         orderId: widget.orderId,
-        toEntityType: 'store',
         stars: _stars,
         comment: _commentCtrl.text.trim(),
         images: _uploadedImageUrls,

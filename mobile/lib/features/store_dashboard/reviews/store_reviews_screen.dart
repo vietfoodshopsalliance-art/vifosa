@@ -16,7 +16,7 @@ final storeReviewsProvider =
   (ref, storeId) async {
     final dio = ref.read(dioClientProvider);
     final res = await dio.dio.get(ApiEndpoints.storeReviews(storeId));
-    return res.data as List<dynamic>;
+    return (res.data['reviews'] as List<dynamic>);
   },
 );
 
@@ -40,6 +40,7 @@ class _StoreReviewsScreenState extends ConsumerState<StoreReviewsScreen> {
     final reviewsAsync = ref.watch(storeReviewsProvider(widget.storeId));
 
     return Scaffold(
+      appBar: AppBar(title: const Text('Đánh giá')),
       body: Column(
         children: [
           // ─ Filters ───────────────────────────────────────────────────────
@@ -103,12 +104,12 @@ class _StoreReviewsScreenState extends ConsumerState<StoreReviewsScreen> {
 
                 if (_starFilter != null) {
                   filtered = filtered
-                      .where((r) => r['rating'] == _starFilter)
+                      .where((r) => r['stars'] == _starFilter)
                       .toList();
                 }
                 if (_repliedFilter != null) {
                   filtered = filtered.where((r) {
-                    final hasReply = r['storeReply'] != null;
+                    final hasReply = r['reply'] != null;
                     return _repliedFilter! ? hasReply : !hasReply;
                   }).toList();
                 }
@@ -160,18 +161,18 @@ class _ReviewCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final rating = review['rating'] as int? ?? 5;
-    final userName = review['userName'] as String? ?? 'Người dùng ẩn danh';
+    final rating = review['stars'] as int? ?? 5;
+    final userName = review['nickname'] as String? ?? 'Người dùng ẩn danh';
     final comment = review['comment'] as String? ?? '';
     final images = (review['images'] as List?)?.cast<String>() ?? [];
     final orderId = review['orderId'] as String?;
     final orderCode = review['orderCode'] as String?;
     final createdAt = review['createdAt'] as String?;
-    final storeReply = review['storeReply'] as Map<String, dynamic>?;
-    final avatarUrl = review['userAvatar'] as String?;
+    final storeReply = review['reply'] as Map<String, dynamic>?;
+    final avatarUrl = review['avatar'] as String?;
 
     final replyText = storeReply?['text'] as String?;
-    final replyCreatedAt = storeReply?['createdAt'] as String?;
+    final replyCreatedAt = storeReply?['at'] as String?;
     final bool canEdit = replyCreatedAt != null &&
         DateTime.now()
             .difference(DateTime.parse(replyCreatedAt))
@@ -343,24 +344,16 @@ class _ReviewCard extends ConsumerWidget {
     String? initialReply,
     required bool isEdit,
   }) {
-    final reviewId = review['id'] as String;
+    final reviewId = review['_id'] as String;
     showDialog(
       context: context,
       builder: (_) => ReplyDialog(
         initialReply: initialReply,
         onSave: (text) async {
-          final dio = ref.read(dioClientProvider);
-          if (isEdit) {
-            await dio.dio.put(
-              ApiEndpoints.reviewReply(reviewId),
-              data: {'reply': text},
-            );
-          } else {
-            await dio.dio.post(
-              ApiEndpoints.reviewReply(reviewId),
-              data: {'reply': text},
-            );
-          }
+          await DioClient.instance.patch(
+            ApiEndpoints.storeReviewReply(storeId, reviewId),
+            data: {'text': text},
+          );
           onRefresh();
         },
       ),

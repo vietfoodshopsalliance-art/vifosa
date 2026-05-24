@@ -12,6 +12,7 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../store/models/store_model.dart' show ShipFeeFormula;
+import '../../order/screens/guest_checkout_screen.dart' show GuestCheckoutArgs;
 
 double _haversineKm(double lat1, double lng1, double lat2, double lng2) {
   const r = 6371.0;
@@ -489,7 +490,20 @@ class _CartScreenState extends ConsumerState<CartScreen> {
               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(sheetCtx);
-                  context.push('/checkout');
+                  final cart = ref.read(cartProvider);
+                  context.push(
+                    '/guest-checkout',
+                    extra: GuestCheckoutArgs(
+                      storeId: cart.storeId ?? '',
+                      storeName: cart.storeName ?? '',
+                      items: cart.items.map((i) => {
+                        'itemId': i.itemId,
+                        'name': i.name,
+                        'qty': i.quantity,
+                        'price': i.price,
+                      }).toList(),
+                    ),
+                  );
                 },
                 child: const Text('Đặt không cần tài khoản'),
               ),

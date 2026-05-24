@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Background = vàng #F4B400, fill toàn bộ circle → vô hình trên nền vàng -->
+    <background android:drawable="@color/ic_launcher_background"/>
+    <!-- Foreground = logo trắng 72dp trong canvas 108dp (cách tâm 36dp, an toàn với mọi circle) -->
+    <foreground android:drawable="@drawable/splash_adaptive_fg"/>
+</adaptive-icon>

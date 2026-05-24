@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/providers/auth_provider.dart';
+import '../../features/auth/screens/splash_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/home/screens/home_screen.dart';
@@ -16,7 +17,7 @@ import '../../features/profile/screens/edit_profile_screen.dart';
 import '../../features/profile/screens/address_list_screen.dart';
 import '../../features/profile/screens/payment_methods_screen.dart';
 import '../../features/profile/screens/settings_screen.dart';
-import '../../features/profile/screens/my_reviews_screen.dart';
+import '../../features/reviews/screens/my_reviews_screen.dart';
 import '../../features/profile/screens/support_ticket_screen.dart';
 import '../../features/store_dashboard/screens/store_dashboard.dart';
 import '../../features/store/screens/create_store_screen.dart';
@@ -25,6 +26,8 @@ import '../../features/store_dashboard/screens/store_menu.dart';
 import '../../features/store_dashboard/settings/store_settings_screen.dart';
 import '../../features/store_dashboard/reviews/store_reviews_screen.dart';
 import '../../features/store_dashboard/screens/store_manage_screen.dart';
+import '../../features/store_dashboard/screens/store_reports_screen.dart';
+import '../../features/store_dashboard/screens/customer_profile_screen.dart';
 import '../../features/profile/screens/favorites_screen.dart';
 import '../../features/notifications/screens/notifications_screen.dart';
 import '../../features/store_detail/screens/store_detail_screen.dart';
@@ -33,6 +36,9 @@ import '../models/category.dart';
 import '../models/store.dart' show StoreStatus;
 import '../../features/order/screens/order_tracking_screen.dart';
 import '../../features/order/screens/checkout_screen.dart';
+import '../../features/order/screens/guest_tracking_screen.dart';
+import '../../features/order/screens/guest_checkout_screen.dart';
+import '../../features/order/screens/guest_order_success_screen.dart';
 import '../widgets/scaffold_with_nav.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -40,8 +46,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     refreshListenable: notifier,
     redirect: notifier._redirect,
-    initialLocation: '/login',
+    initialLocation: '/splash',
     routes: [
+      // ── Splash ────────────────────────────────────────────────────────────
+      GoRoute(
+        path: '/splash',
+        builder: (_, __) => const SplashScreen(),
+      ),
+
       // ── Auth (không có bottom nav) ────────────────────────────────────────
       GoRoute(
         path: '/login',
@@ -157,6 +169,35 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         ),
       ),
 
+      // ── Guest (không cần đăng nhập) ───────────────────────────────────────
+      GoRoute(
+        path: '/track',
+        builder: (_, state) => GuestTrackingScreen(
+          orderCode: state.uri.queryParameters['code'] ?? '',
+          token: state.uri.queryParameters['t'],
+        ),
+      ),
+      GoRoute(
+        path: '/guest-checkout',
+        builder: (_, state) {
+          final args = state.extra as GuestCheckoutArgs;
+          return GuestCheckoutScreen(args: args);
+        },
+      ),
+      GoRoute(
+        path: '/guest-order-success',
+        builder: (_, state) {
+          final extra = state.extra as Map<String, dynamic>;
+          return GuestOrderSuccessScreen(
+            code:             extra['code'] as String,
+            token:            extra['token'] as String,
+            storeName:        extra['storeName'] as String,
+            storeBankAccount: extra['storeBankAccount'] as Map<String, dynamic>?,
+            totalAmount:      (extra['totalAmount'] as num).toInt(),
+          );
+        },
+      ),
+
       // ── Store Dashboard ───────────────────────────────────────────────────
       GoRoute(
         path: '/my-stores',
@@ -196,6 +237,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           storeId: state.pathParameters['storeId']!,
         ),
       ),
+      GoRoute(
+        path: '/store-dashboard/:storeId/reports',
+        builder: (_, state) => StoreReportsScreen(
+          storeId: state.pathParameters['storeId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/store-dashboard/:storeId/customers/:customerId',
+        builder: (_, state) => CustomerProfileScreen(
+          storeId: state.pathParameters['storeId']!,
+          customerId: state.pathParameters['customerId']!,
+        ),
+      ),
 
       // ── Admin (placeholder) ───────────────────────────────────────────────
       GoRoute(
@@ -218,10 +272,31 @@ class _RouterNotifier extends ChangeNotifier {
     if (auth.isLoading) return null;
 
     final loc = state.matchedLocation;
-    final isPublic = loc == '/login' || loc == '/register';
 
-    if (!auth.isAuthenticated && !isPublic) return '/login';
-    if (auth.isAuthenticated && isPublic) return '/home';
+    // Đã đăng nhập → không cần ở trang login/register
+    if (auth.isAuthenticated && (loc == '/login' || loc == '/register')) {
+      return '/home';
+    }
+
+    // Các route yêu cầu đăng nhập
+    const protectedPrefixes = [
+      '/orders',
+      '/profile',
+      '/checkout',
+      '/notifications',
+      '/favorites',
+      '/store/create',
+      '/my-stores',
+      '/store-dashboard',
+      '/admin',
+    ];
+
+    final isProtected = protectedPrefixes.any(
+      (p) => loc == p || loc.startsWith('$p/'),
+    );
+
+    if (!auth.isAuthenticated && isProtected) return '/login';
+
     return null;
   }
 }

@@ -9,7 +9,7 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/services/image_service.dart';
 import '../../../core/widgets/app_button.dart';
-import '../../../core/theme/theme.dart';
+import '../../../core/theme/app_theme.dart';
 
 // ---------------------------------------------------------------------------
 // Models

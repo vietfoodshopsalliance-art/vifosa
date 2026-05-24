@@ -10,7 +10,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/network/socket_client.dart';
-import '../../../core/theme/theme.dart';
+import '../../../core/theme/app_theme.dart';
 import '../models/store_order.dart';
 import '../orders/widgets/order_card_store.dart';
 import '../orders/store_order_detail_screen.dart';
@@ -209,26 +209,36 @@ class StoreOrdersNotifier extends StateNotifier<StoreOrdersState> {
     } catch (_) {}
   }
 
-  Future<void> _fetchHistory() async {
+  Future<void> _fetchHistory([DateTime? date]) async {
+    final d = date ?? state.historyDate ?? DateTime.now();
+    final dayStart = DateTime(d.year, d.month, d.day);
+    final dayEnd = DateTime(d.year, d.month, d.day, 23, 59, 59, 999);
     try {
-      final orders = await _fetchTab('history');
+      final orders = await _fetchTab('history', dateFrom: dayStart, dateTo: dayEnd);
       final completed = orders.where((o) => o.mainStatus == 'completed');
       final cancelled = orders.where((o) => o.mainStatus == 'cancelled');
-      final revenue =
-          completed.fold<double>(0, (sum, o) => sum + o.total);
+      final revenue = completed.fold<double>(0, (sum, o) => sum + o.total);
       state = state.copyWith(
         historyOrders: orders,
         historyCompleted: completed.length,
         historyCancelled: cancelled.length,
         historyRevenue: revenue,
+        historyDate: d,
       );
     } catch (_) {}
   }
 
-  Future<List<StoreOrder>> _fetchTab(String tab) async {
+  Future<List<StoreOrder>> _fetchTab(
+    String tab, {
+    DateTime? dateFrom,
+    DateTime? dateTo,
+  }) async {
+    final params = <String, dynamic>{'tab': tab, 'limit': '50'};
+    if (dateFrom != null) params['dateFrom'] = dateFrom.toUtc().toIso8601String();
+    if (dateTo != null) params['dateTo'] = dateTo.toUtc().toIso8601String();
     final res = await DioClient.instance.get(
       ApiEndpoints.myStoreOrders(storeId),
-      queryParameters: {'tab': tab, 'limit': '50'},
+      queryParameters: params,
     );
     final data = res.data is Map ? res.data as Map<String, dynamic> : <String, dynamic>{};
     final list = data['orders'] as List? ?? (res.data as List? ?? []);
@@ -297,17 +307,16 @@ class StoreOrdersNotifier extends StateNotifier<StoreOrdersState> {
     } else if (order.mainStatus == 'preparing') {
       await DioClient.instance.patch(ApiEndpoints.orderDeliver(orderId), data: {});
     }
-    // 'delivering' → fall through to complete below (COD case)
+    // Hoàn thành đơn cho mọi phương thức thanh toán
+    await DioClient.instance.patch(ApiEndpoints.orderComplete(orderId), data: {});
 
-    // COD: bàn giao = giao xong + thu tiền ngay
-    if (order.paymentMethod == 'cod') {
-      await DioClient.instance.patch(ApiEndpoints.orderComplete(orderId), data: {});
-      if (order.remainingAmount > 0) {
-        await DioClient.instance.patch(
-          ApiEndpoints.orderConfirmMoney(orderId),
-          data: {'amount': order.remainingAmount},
-        );
-      }
+    // Thu tiền khi giao (COD và fifty_fifty)
+    if (order.remainingAmount > 0 &&
+        (order.paymentMethod == 'cod' || order.paymentMethod == 'fifty_fifty')) {
+      await DioClient.instance.patch(
+        ApiEndpoints.orderConfirmMoney(orderId),
+        data: {'amount': order.remainingAmount},
+      );
     }
 
     await fetchOrders();
@@ -335,6 +344,10 @@ class StoreOrdersNotifier extends StateNotifier<StoreOrdersState> {
 
   void setHistorySearch(String q) {
     state = state.copyWith(historySearch: q, error: null);
+  }
+
+  Future<void> setHistoryDate(DateTime date) async {
+    await _fetchHistory(date);
   }
 }
 
@@ -404,8 +417,7 @@ class _StoreOrdersScreenState extends ConsumerState<StoreOrdersScreen>
         Future.delayed(Duration.zero, () => setState(() => _navIndex = 0));
         break;
       case 3:
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Tính năng sắp ra mắt')));
+        context.push('/store-dashboard/${widget.storeId}/reports');
         Future.delayed(Duration.zero, () => setState(() => _navIndex = 0));
         break;
       case 4:
@@ -819,6 +831,7 @@ class _PendingTabState extends ConsumerState<_PendingTab> {
         maxChildSize: 0.95,
         builder: (_, ctrl) => StoreOrderDetailScreen(
           order: order,
+          storeId: widget.storeId,
           onDeliver: () async {
             try {
               await notifier.deliverOrder(order.id);
@@ -989,6 +1002,7 @@ class _InProgressTab extends ConsumerWidget {
         maxChildSize: 0.95,
         builder: (_, __) => StoreOrderDetailScreen(
           order: order,
+          storeId: storeId,
           onDeliver: () async {
             try {
               await notifier.deliverOrder(order.id);
@@ -1058,9 +1072,19 @@ class _HistoryTabState extends ConsumerState<_HistoryTab> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(
             children: [
-              Text(
-                'Hôm nay $total (hoàn thành ${s.historyCompleted}, hủy ${s.historyCancelled})',
-                style: const TextStyle(fontSize: 12),
+              GestureDetector(
+                onTap: () => _pickDate(context, s, notifier),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${_dateLabel(s.historyDate)} $total (hoàn thành ${s.historyCompleted}, hủy ${s.historyCancelled})',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(Icons.arrow_drop_down, size: 16, color: Colors.grey.shade600),
+                  ],
+                ),
               ),
               const Spacer(),
               Text(
@@ -1178,10 +1202,42 @@ class _HistoryTabState extends ConsumerState<_HistoryTab> {
       builder: (_) => DraggableScrollableSheet(
         expand: false,
         initialChildSize: 0.9,
-        builder: (_, __) =>
-            StoreOrderDetailScreen(order: order),
+        builder: (_, __) => StoreOrderDetailScreen(
+          order: order,
+          storeId: widget.storeId,
+        ),
       ),
     );
+  }
+
+  Future<void> _pickDate(
+    BuildContext context,
+    StoreOrdersState s,
+    StoreOrdersNotifier notifier,
+  ) async {
+    final now = DateTime.now();
+    final initial = s.historyDate ?? now;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial.isAfter(now) ? now : initial,
+      firstDate: DateTime(2024, 1, 1),
+      lastDate: now,
+      helpText: 'Chọn ngày xem thống kê',
+    );
+    if (picked != null) {
+      await notifier.setHistoryDate(picked);
+    }
+  }
+
+  bool _isToday(DateTime? d) {
+    if (d == null) return true;
+    final now = DateTime.now();
+    return d.year == now.year && d.month == now.month && d.day == now.day;
+  }
+
+  String _dateLabel(DateTime? d) {
+    if (_isToday(d)) return 'Hôm nay';
+    return '${d!.day}/${d.month}/${d.year}';
   }
 
   String _fmtRevenue(double v) {

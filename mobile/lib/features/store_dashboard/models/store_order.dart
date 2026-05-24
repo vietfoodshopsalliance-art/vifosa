@@ -47,6 +47,7 @@ class CancelInfo {
 class StoreOrder {
   final String id;
   final String code;
+  final String? customerId;
   final String mainStatus;
   final String paymentStatus;
   final String? refundStatus;
@@ -72,6 +73,7 @@ class StoreOrder {
   const StoreOrder({
     required this.id,
     required this.code,
+    this.customerId,
     required this.mainStatus,
     required this.paymentStatus,
     this.refundStatus,
@@ -114,6 +116,7 @@ class StoreOrder {
     return StoreOrder(
       id: (json['_id'] ?? json['id'] ?? '').toString(),
       code: json['code'] as String? ?? '',
+      customerId: json['customerId']?.toString(),
       mainStatus: json['mainStatus'] as String? ?? 'pending_store',
       paymentStatus: json['paymentStatus'] as String? ?? 'unpaid',
       paymentMethod: json['paymentMethod'] as String? ?? 'bank_transfer',

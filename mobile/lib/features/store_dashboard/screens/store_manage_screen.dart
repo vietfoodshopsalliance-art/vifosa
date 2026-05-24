@@ -4,11 +4,75 @@
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/theme/theme.dart';
+import '../../../core/network/dio_client.dart';
+import '../../../core/network/api_endpoints.dart';
+import '../../../core/theme/app_theme.dart';
 
 class StoreManageScreen extends StatelessWidget {
   final String storeId;
   const StoreManageScreen({super.key, required this.storeId});
+
+  Future<void> _confirmDeleteStore(BuildContext context) async {
+    // Bước 1: cảnh báo
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Xóa cửa hàng?'),
+        content: const Text(
+          'Cửa hàng sẽ bị xóa vĩnh viễn. Tất cả dữ liệu menu, đơn hàng liên quan sẽ bị ẩn. '
+          'Hành động này không thể hoàn tác.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Xóa cửa hàng'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    // Bước 2: xác nhận lần 2
+    final doubleConfirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Xác nhận lần cuối'),
+        content: const Text(
+            'Bạn có chắc chắn muốn xóa? Không thể khôi phục lại.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Không'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Tôi chắc chắn, xóa ngay'),
+          ),
+        ],
+      ),
+    );
+    if (doubleConfirm != true || !context.mounted) return;
+
+    try {
+      await DioClient.instance.delete(ApiEndpoints.myStoreById(storeId));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã xóa cửa hàng')));
+        context.go('/store-dashboard');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +97,16 @@ class StoreManageScreen extends StatelessWidget {
             badge: 'Đang xây dựng',
             onTap: null,
           ),
+          const SizedBox(height: 24),
+          const Divider(),
+          const SizedBox(height: 12),
+          _ManageCard(
+            icon: Icons.delete_forever_outlined,
+            title: 'Xóa cửa hàng',
+            subtitle: 'Xóa vĩnh viễn cửa hàng này khỏi hệ thống',
+            isDanger: true,
+            onTap: () => _confirmDeleteStore(context),
+          ),
         ],
       ),
     );
@@ -44,6 +118,7 @@ class _ManageCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final String? badge;
+  final bool isDanger;
   final VoidCallback? onTap;
 
   const _ManageCard({
@@ -51,6 +126,7 @@ class _ManageCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.badge,
+    this.isDanger = false,
     this.onTap,
   });
 
@@ -73,14 +149,20 @@ class _ManageCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: onTap != null
-                      ? AppTheme.primary.withValues(alpha: 0.1)
-                      : Colors.grey.shade100,
+                  color: isDanger
+                      ? Colors.red.withValues(alpha: 0.1)
+                      : onTap != null
+                          ? AppTheme.primary.withValues(alpha: 0.1)
+                          : Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
                   icon,
-                  color: onTap != null ? AppTheme.primary : Colors.grey,
+                  color: isDanger
+                      ? Colors.red
+                      : onTap != null
+                          ? AppTheme.primary
+                          : Colors.grey,
                   size: 24,
                 ),
               ),
@@ -96,9 +178,11 @@ class _ManageCard extends StatelessWidget {
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 15,
-                            color: onTap != null
-                                ? Colors.black87
-                                : Colors.grey.shade500,
+                            color: isDanger
+                                ? Colors.red
+                                : onTap != null
+                                    ? Colors.black87
+                                    : Colors.grey.shade500,
                           ),
                         ),
                         if (badge != null) ...[

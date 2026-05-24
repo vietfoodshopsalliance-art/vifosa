@@ -1,5 +1,5 @@
-// lib/features/home/widgets/section_header.dart
-// Tiêu đề từng section trong home feed
+// lib/shared/widgets/section_header.dart
+// Tiêu đề từng section — dùng chung toàn app
 
 import 'package:flutter/material.dart';
 
