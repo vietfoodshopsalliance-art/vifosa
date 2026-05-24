@@ -22,6 +22,7 @@ export default function AdminSettingsContentPage() {
   const [draft, setDraft]     = useState('')
   const [saving, setSaving]   = useState(false)
   const [saved, setSaved]     = useState(false)
+  const [error, setError]     = useState<string | null>(null)
 
   useEffect(() => {
     async function loadContent() {
@@ -44,14 +45,18 @@ export default function AdminSettingsContentPage() {
 
   async function publish() {
     setSaving(true)
+    setError(null)
     try {
       const key = tab === 'tos' ? 'tos_content' : 'privacy_content'
       const res = await api.put<ContentEntry>(`/admin/settings/${key}`, { value: draft })
       if (tab === 'tos') setTos(res)
       else setPrivacy(res)
       setSaved(true)
-    } catch {}
-    finally { setSaving(false) }
+    } catch (e: any) {
+      setError(e?.message ?? 'Lỗi không xác định')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const current = tab === 'tos' ? tos : privacy
@@ -68,6 +73,12 @@ export default function AdminSettingsContentPage() {
           {saving ? 'Đang lưu...' : saved ? '✓ Đã lưu & Publish' : 'Lưu & Publish'}
         </button>
       </div>
+
+      {error && (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+          Lỗi: {error}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="mb-4 flex gap-1 border-b border-gray-200">
