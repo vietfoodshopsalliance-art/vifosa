@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
@@ -67,6 +68,15 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#FDFAF3] px-4">
       <div className="w-full max-w-sm">
+        <div className="mb-4">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1 text-sm text-[#6B5C3E] hover:text-[#1D7A4E] transition-colors"
+          >
+            ← Về trang chủ
+          </Link>
+        </div>
+
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-[#1D7A4E]">Viet Shops</h1>
           <p className="mt-1 text-sm text-[#6B5C3E]">Đăng nhập để quản lý</p>
