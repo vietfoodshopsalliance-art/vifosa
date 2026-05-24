@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     })
   } catch {}
 
-  const res = NextResponse.redirect(new URL('/login', request.url))
+  const res = NextResponse.redirect(new URL('/login', request.url), { status: 303 })
   res.cookies.set('userRoles', '', { maxAge: 0, path: '/' })
   res.cookies.set('userName', '', { maxAge: 0, path: '/' })
   res.cookies.set('storeId', '', { maxAge: 0, path: '/' })
