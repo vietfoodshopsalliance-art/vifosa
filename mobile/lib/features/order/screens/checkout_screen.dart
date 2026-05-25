@@ -13,6 +13,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../../cart/screens/cart_screen.dart' show cartProvider;
 import '../../profile/models/address_model.dart';
 import '../../store/models/store_model.dart' show ShipFeeFormula;
+import '../../../core/providers/location_provider.dart' show locationProvider;
 
 double _haversineKm(double lat1, double lng1, double lat2, double lng2) {
   const r = 6371.0;
@@ -109,14 +110,26 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       _defaultAddress = addr;
 
       if (!mounted) return;
+
+      double? deliveryLat = (addr.lat != 0.0 || addr.lng != 0.0) ? addr.lat : null;
+      double? deliveryLng = (addr.lat != 0.0 || addr.lng != 0.0) ? addr.lng : null;
+
+      // Fallback: nếu địa chỉ lưu không có tọa độ, dùng locationProvider
+      if (deliveryLat == null) {
+        final gps = await ref.read(locationProvider.future);
+        if (mounted) {
+          deliveryLat = gps.lat;
+          deliveryLng = gps.lng;
+        }
+      }
+
+      if (!mounted) return;
       setState(() {
         _receiverNameCtrl.text  = addr.receiverName;
         _receiverPhoneCtrl.text = addr.receiverPhone;
         _addressCtrl.text       = addr.text;
-        if (addr.lat != 0.0 || addr.lng != 0.0) {
-          _deliveryLat = addr.lat;
-          _deliveryLng = addr.lng;
-        }
+        _deliveryLat = deliveryLat;
+        _deliveryLng = deliveryLng;
       });
       _fetchShipFee();
     } catch (e) {
@@ -519,7 +532,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       ),
                     )),
                     const Divider(height: 16),
-                    _summaryRow('Tạm tính:', _vnd.format(subtotal)),
+                    _summaryRow('Tiền hàng:', _vnd.format(subtotal)),
 
                     const SizedBox(height: 4),
 

@@ -128,11 +128,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (_) {}
   }
 
-  // Parse lỗi từ backend Fastify: { message: "..." }
+  // Parse lỗi từ backend Fastify: { message } hoặc { issues: [{ message }] }
   String _parseDioError(DioException e) {
     try {
       final data = e.response?.data;
-      if (data is Map) return data['message'] ?? 'Lỗi kết nối';
+      if (data is Map) {
+        if (data['message'] != null) return data['message'] as String;
+        final issues = data['issues'];
+        if (issues is List && issues.isNotEmpty) {
+          final msg = issues.first['message'];
+          if (msg is String) return msg;
+        }
+        return 'Lỗi xác thực dữ liệu';
+      }
     } catch (_) {}
     return switch (e.type) {
       DioExceptionType.connectionTimeout => 'Hết thời gian kết nối',

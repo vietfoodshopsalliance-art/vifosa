@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Metadata } from 'next'
 
-export const metadata: Metadata = { title: 'Điều khoản sử dụng — Vifosa' }
+export const metadata: Metadata = { title: 'Điều khoản sử dụng — Viet Shops' }
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +27,7 @@ export default async function TermsPage() {
     <div className="min-h-screen bg-[#FDFAF3]">
       <header className="border-b border-gray-200 bg-[#1D7A4E]">
         <div className="mx-auto flex h-14 max-w-3xl items-center px-4">
-          <Link href="/" className="text-lg font-bold text-white">Vifosa</Link>
+          <Link href="/" className="text-lg font-bold text-white">Viet Shops</Link>
         </div>
       </header>
 

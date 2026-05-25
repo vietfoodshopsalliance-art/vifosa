@@ -3,6 +3,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/services/image_service.dart';
 import '../models/store_card.dart';
 
 // ── Compact horizontal card ───────────────────────────────────────────────────
@@ -130,6 +131,7 @@ class StoreCardVertical extends StatelessWidget {
                 url: store.coverImage ?? store.avatarImage,
                 height: 80,
                 width: 100,
+                isThumb: false,
               ),
             ),
             Expanded(
@@ -211,12 +213,18 @@ class _CoverImage extends StatelessWidget {
   final String? url;
   final double height;
   final double? width;
+  final bool isThumb;
 
-  const _CoverImage({this.url, required this.height, this.width});
+  const _CoverImage({
+    this.url,
+    required this.height,
+    this.width,
+    this.isThumb = true,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final placeholder = Container(
+    final fallback = Container(
       width: width,
       height: height,
       color: const Color(0xFFF5F5F5),
@@ -225,15 +233,72 @@ class _CoverImage extends StatelessWidget {
       ),
     );
 
-    if (url == null || url!.isEmpty) return placeholder;
+    if (url == null || url!.isEmpty) return fallback;
+
+    final transformed =
+        isThumb ? ImageService.thumbnail(url!) : ImageService.detail(url!);
 
     return CachedNetworkImage(
-      imageUrl: url!,
+      imageUrl: transformed,
       width: width,
       height: height,
       fit: BoxFit.cover,
-      placeholder: (_, __) => placeholder,
-      errorWidget: (_, __, ___) => placeholder,
+      fadeInDuration: const Duration(milliseconds: 250),
+      placeholder: (_, __) => _ShimmerBox(width: width, height: height),
+      errorWidget: (_, __, ___) => fallback,
+    );
+  }
+}
+
+class _ShimmerBox extends StatefulWidget {
+  final double? width;
+  final double height;
+
+  const _ShimmerBox({this.width, required this.height});
+
+  @override
+  State<_ShimmerBox> createState() => _ShimmerBoxState();
+}
+
+class _ShimmerBoxState extends State<_ShimmerBox>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) => Container(
+        width: widget.width,
+        height: widget.height,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment(-1 + 2 * _ctrl.value, 0),
+            end: Alignment(0 + 2 * _ctrl.value, 0),
+            colors: const [
+              Color(0xFFE0E0E0),
+              Color(0xFFF5F5F5),
+              Color(0xFFE0E0E0),
+            ],
+            stops: const [0.0, 0.5, 1.0],
+          ),
+        ),
+      ),
     );
   }
 }

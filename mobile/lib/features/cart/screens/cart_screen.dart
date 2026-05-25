@@ -13,6 +13,7 @@ import '../../../core/network/api_endpoints.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../store/models/store_model.dart' show ShipFeeFormula;
 import '../../order/screens/guest_checkout_screen.dart' show GuestCheckoutArgs;
+import '../../../core/providers/location_provider.dart' show locationProvider;
 
 double _haversineKm(double lat1, double lng1, double lat2, double lng2) {
   const r = 6371.0;
@@ -362,34 +363,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     super.dispose();
   }
 
-  // Lấy GPS từ địa chỉ mặc định của user (giống checkout_screen._prefillFromUser)
-  Future<({double lat, double lng})?> _getDefaultAddressGps() async {
-    try {
-      final dio = ref.read(dioClientProvider);
-      final res = await dio.dio.get(ApiEndpoints.myAddresses);
-      final data = res.data;
-      List<dynamic> list = data is List
-          ? data
-          : ((data as Map)['addresses'] ?? data['data'] ?? data['items'] ?? []) as List;
-      if (list.isEmpty) return null;
-
-      Map<String, dynamic>? addr;
-      for (final a in list) {
-        if ((a as Map)['isDefault'] == true) { addr = Map<String, dynamic>.from(a); break; }
-      }
-      addr ??= Map<String, dynamic>.from(list.first as Map);
-
-      final coords = ((addr['address'] as Map?)?['location'] as Map?)?['coordinates'] as List?;
-      if (coords == null || coords.length < 2) return null;
-      final lng = (coords[0] as num).toDouble();
-      final lat = (coords[1] as num).toDouble();
-      if (lat == 0.0 && lng == 0.0) return null;
-      return (lat: lat, lng: lng);
-    } catch (_) {
-      return null;
-    }
-  }
-
   Future<void> _fetchShipFee() async {
     final storeId = ref.read(cartProvider).storeId;
     if (storeId == null || storeId.isEmpty) return;
@@ -397,8 +370,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final isLoggedIn = ref.read(authProvider).user != null;
     if (!isLoggedIn) return; // khách vãng lai: hiển thị "Tính khi đặt hàng"
 
-    final gps = await _getDefaultAddressGps();
-    if (gps == null || !mounted) return;
+    // Dùng locationProvider: GPS → địa chỉ lưu → IP → fallback TP.HCM
+    final gps = await ref.read(locationProvider.future);
+    if (!mounted) return;
 
     setState(() => _shipFeeLoading = true);
     try {
@@ -660,7 +634,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           child: SafeArea(
             child: Column(
               children: [
-                _summaryRow('Tạm tính:', _vnd.format(cart.subtotal), theme, bold: false),
+                _summaryRow('Tiền hàng:', _vnd.format(cart.subtotal), theme, bold: false),
                 const SizedBox(height: 4),
                 // Phí ship
                 if (_shipFeeLoading)

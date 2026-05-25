@@ -146,7 +146,8 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
         _pmFiftyFifty = pm['fiftyFifty'] as bool? ?? false;
 
         final ba = d['bankAccount'] as Map? ?? {};
-        _selectedBank = ba['bank'] as String?;
+        final bankFromDb = ba['bank'] as String?;
+        _selectedBank = _banks.contains(bankFromDb) ? bankFromDb : null;
         _bankNoCtrl.text = ba['number'] as String? ?? '';
         _bankNameCtrl.text = (ba['name'] ?? ba['holder']) as String? ?? '';
 
@@ -175,9 +176,15 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
 
     } catch (e) {
       if (mounted) {
+        final is403 = e is DioException && e.response?.statusCode == 403;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không tải được cài đặt: $e')),
+          SnackBar(
+            content: Text(is403
+                ? 'Bạn không có quyền truy cập quán này'
+                : 'Không tải được cài đặt: $e'),
+          ),
         );
+        if (is403) Navigator.of(context).pop();
       }
       setState(() => _initialLoaded = true);
     }

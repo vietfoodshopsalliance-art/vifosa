@@ -19,11 +19,7 @@ final effectiveRadiusProvider = StateProvider<int>((ref) => 5);
 // ── Single /home-feed call ────────────────────────────────────────────────────
 
 final homeFeedDataProvider =
-    FutureProvider.autoDispose.family<HomeFeedData, int>((ref, radius) async {
-  // Re-fetch khi trạng thái đăng nhập thay đổi (guest→logged in hoặc logout)
-  // để backend có thể trả favorites / recentPurchases theo đúng user.
-  ref.watch(authProvider.select((s) => s.isAuthenticated));
-
+    FutureProvider.family<HomeFeedData, int>((ref, radius) async {
   final loc = await ref.read(locationProvider.future);
   final res = await ref.read(dioClientProvider).dio.get(
     '/home-feed',
@@ -40,25 +36,25 @@ final homeFeedDataProvider =
 // Tất cả dùng effectiveRadiusProvider để dùng chung 1 API call với NearbySection.
 
 final newStoresProvider =
-    Provider.autoDispose<AsyncValue<List<StoreCard>>>((ref) {
+    Provider<AsyncValue<List<StoreCard>>>((ref) {
   final radius = ref.watch(effectiveRadiusProvider);
   return ref.watch(homeFeedDataProvider(radius)).whenData((d) => d.newStores);
 });
 
 final popularStoresProvider =
-    Provider.autoDispose<AsyncValue<List<StoreCard>>>((ref) {
+    Provider<AsyncValue<List<StoreCard>>>((ref) {
   final radius = ref.watch(effectiveRadiusProvider);
   return ref.watch(homeFeedDataProvider(radius)).whenData((d) => d.trendingStores);
 });
 
 final recentPurchaseStoresProvider =
-    Provider.autoDispose<AsyncValue<List<StoreCard>>>((ref) {
+    Provider<AsyncValue<List<StoreCard>>>((ref) {
   final radius = ref.watch(effectiveRadiusProvider);
   return ref.watch(homeFeedDataProvider(radius)).whenData((d) => d.recentPurchases);
 });
 
 final favoriteStoresProvider =
-    Provider.autoDispose<AsyncValue<List<StoreCard>>>((ref) {
+    Provider<AsyncValue<List<StoreCard>>>((ref) {
   final radius = ref.watch(effectiveRadiusProvider);
   return ref.watch(homeFeedDataProvider(radius)).whenData((d) => d.favorites);
 });
@@ -105,6 +101,15 @@ class NearbyNotifier extends StateNotifier<NearbyState> {
 
   NearbyNotifier(this._ref) : super(const NearbyState()) {
     _init(5);
+    // Khi auth settle (guest→logged in hoặc logout), refetch để lấy
+    // favorites / recentPurchases đúng user. Dùng listen thay vì watch
+    // trong homeFeedDataProvider để tránh provider bị restart mid-load.
+    _ref.listen<bool>(
+      authProvider.select((s) => s.isAuthenticated),
+      (prev, next) {
+        if (prev != null && prev != next) refresh();
+      },
+    );
   }
 
   final Ref _ref;
@@ -185,6 +190,6 @@ class NearbyNotifier extends StateNotifier<NearbyState> {
 }
 
 final nearbyStoresProvider =
-    StateNotifierProvider.autoDispose<NearbyNotifier, NearbyState>(
+    StateNotifierProvider<NearbyNotifier, NearbyState>(
   (ref) => NearbyNotifier(ref),
 );

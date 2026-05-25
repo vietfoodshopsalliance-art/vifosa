@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -186,7 +187,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
                   ),
                   validator: (v) =>
-                      (v == null || v.length < 6) ? 'Tối thiểu 6 ký tự' : null,
+                      (v == null || v.length < 8) ? 'Tối thiểu 8 ký tự' : null,
                 ),
                 const SizedBox(height: 20),
 
@@ -200,22 +201,29 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       onChanged: (v) => setState(() => _tosChecked = v ?? false),
                     ),
                     Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _tosChecked = !_tosChecked),
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: Text.rich(TextSpan(children: [
-                            const TextSpan(text: 'Tôi đồng ý với '),
-                            TextSpan(
-                              text: 'Điều khoản dịch vụ',
-                              style: const TextStyle(
-                                color: Colors.orange,
-                                decoration: TextDecoration.underline,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Text.rich(TextSpan(children: [
+                          const TextSpan(text: 'Tôi đồng ý với '),
+                          WidgetSpan(
+                            alignment: PlaceholderAlignment.baseline,
+                            baseline: TextBaseline.alphabetic,
+                            child: GestureDetector(
+                              onTap: () => launchUrl(
+                                Uri.parse('https://project-f7r57.vercel.app/terms'),
+                                mode: LaunchMode.externalApplication,
+                              ),
+                              child: const Text(
+                                'Điều khoản dịch vụ',
+                                style: TextStyle(
+                                  color: Colors.orange,
+                                  decoration: TextDecoration.underline,
+                                ),
                               ),
                             ),
-                            const TextSpan(text: ' của Viet Shops'),
-                          ])),
-                        ),
+                          ),
+                          const TextSpan(text: ' của Viet Shops'),
+                        ])),
                       ),
                     ),
                   ],

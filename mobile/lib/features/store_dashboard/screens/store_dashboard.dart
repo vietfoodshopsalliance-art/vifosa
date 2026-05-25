@@ -12,7 +12,7 @@ import '../../../core/network/api_endpoints.dart';
 
 // ─── Provider ────────────────────────────────────────────────────────────────
 
-final _myStoresProvider = FutureProvider<List<_StoreSummary>>((ref) async {
+final _myStoresProvider = FutureProvider.autoDispose<List<_StoreSummary>>((ref) async {
   final res = await DioClient.instance.get(ApiEndpoints.myStores);
   final raw = res.data;
   final list = raw is List ? raw : (raw as Map)['stores'] as List? ?? [];

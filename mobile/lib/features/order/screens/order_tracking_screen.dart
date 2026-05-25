@@ -395,7 +395,7 @@ class _TrackingTab extends StatelessWidget {
                       )),
                   const Divider(height: 16),
                   _summaryRow(
-                      'Tạm tính:', _vnd.format(itemsTotal),
+                      'Tiền hàng:', _vnd.format(itemsTotal),
                       color: Colors.grey.shade700),
                   const SizedBox(height: 4),
                   _summaryRow(

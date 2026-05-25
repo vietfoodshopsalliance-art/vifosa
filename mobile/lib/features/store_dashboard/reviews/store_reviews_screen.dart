@@ -14,8 +14,7 @@ import 'reply_dialog.dart';
 final storeReviewsProvider =
     FutureProvider.family.autoDispose<List<dynamic>, String>(
   (ref, storeId) async {
-    final dio = ref.read(dioClientProvider);
-    final res = await dio.dio.get(ApiEndpoints.storeReviews(storeId));
+    final res = await DioClient.instance.get(ApiEndpoints.storeReviews(storeId));
     return (res.data['reviews'] as List<dynamic>);
   },
 );

@@ -466,7 +466,7 @@ class _GuestCheckoutScreenState extends State<GuestCheckoutScreen> {
 
                     // Tạm tính
                     _SummaryRow(
-                      label: 'Tạm tính:',
+                      label: 'Tiền hàng:',
                       value: _vnd.format(_itemsTotal),
                     ),
                     const SizedBox(height: 6),

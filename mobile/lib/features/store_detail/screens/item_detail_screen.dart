@@ -29,10 +29,6 @@ class ItemDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final likedAsync = ref.watch(itemLikeProvider((item.id, item.likeId)));
     final cart = ref.watch(cartProvider);
-    final qty = cart.items.fold<int>(
-      0,
-      (sum, e) => e.itemId == item.id ? sum + e.quantity : sum,
-    );
     final canOrder = storeStatus != StoreStatus.emergencyClosed && item.isAvailable;
     final theme = Theme.of(context);
 
@@ -165,39 +161,13 @@ class ItemDetailScreen extends ConsumerWidget {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: canOrder
-              ? qty == 0
-                  ? ElevatedButton.icon(
-                      onPressed: () => _handleAdd(context, ref, cart),
-                      icon: const Icon(Icons.add_shopping_cart),
-                      label: const Text('Thêm vào giỏ hàng'),
-                      style: ElevatedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(52)),
-                    )
-                  : Row(
-                      children: [
-                        _circleBtn(
-                          icon: Icons.remove,
-                          color: Colors.grey.shade400,
-                          onTap: () => ref
-                              .read(cartProvider.notifier)
-                              .updateQty(item.id, qty - 1),
-                        ),
-                        Expanded(
-                          child: Center(
-                            child: Text(
-                              '$qty',
-                              style: const TextStyle(
-                                  fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ),
-                        _circleBtn(
-                          icon: Icons.add,
-                          color: theme.colorScheme.primary,
-                          onTap: () => _handleAdd(context, ref, cart),
-                        ),
-                      ],
-                    )
+              ? ElevatedButton.icon(
+                  onPressed: () => _handleAdd(context, ref, cart),
+                  icon: const Icon(Icons.add_shopping_cart),
+                  label: const Text('Thêm vào giỏ hàng'),
+                  style: ElevatedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52)),
+                )
               : ElevatedButton(
                   onPressed: null,
                   style: ElevatedButton.styleFrom(
@@ -246,6 +216,7 @@ class ItemDetailScreen extends ConsumerWidget {
             stock: item.stock,
           ),
         );
+    if (context.mounted) Navigator.pop(context);
   }
 
   Widget _imagePlaceholder() => Container(
@@ -255,22 +226,4 @@ class ItemDetailScreen extends ConsumerWidget {
         ),
       );
 
-  Widget _circleBtn({
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) =>
-      GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.12),
-            shape: BoxShape.circle,
-            border: Border.all(color: color, width: 1.5),
-          ),
-          child: Icon(icon, size: 20, color: color),
-        ),
-      );
 }

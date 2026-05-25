@@ -5,26 +5,21 @@ import 'package:go_router/go_router.dart';
 import '../../features/cart/screens/cart_screen.dart';
 
 class ScaffoldWithNav extends ConsumerWidget {
-  final Widget child;
-  const ScaffoldWithNav({super.key, required this.child});
-
-  static const _routes = ['/home', '/search', '/cart', '/orders', '/profile'];
-
-  int _currentIndex(BuildContext context) {
-    final loc = GoRouterState.of(context).matchedLocation;
-    final i = _routes.indexWhere((r) => loc.startsWith(r));
-    return i < 0 ? 0 : i;
-  }
+  final StatefulNavigationShell navigationShell;
+  const ScaffoldWithNav({super.key, required this.navigationShell});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cartCount = ref.watch(cartProvider.select((s) => s.totalItems));
 
     return Scaffold(
-      body: child,
+      body: navigationShell,
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex(context),
-        onDestinationSelected: (i) => context.go(_routes[i]),
+        selectedIndex: navigationShell.currentIndex,
+        onDestinationSelected: (i) => navigationShell.goBranch(
+          i,
+          initialLocation: i == navigationShell.currentIndex,
+        ),
         destinations: [
           const NavigationDestination(
             icon: Icon(Icons.home_outlined),

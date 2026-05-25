@@ -4,6 +4,7 @@
 // Bottom nav: Dashboard / Menu / Đánh giá / Báo cáo / Quản lý
 
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -185,7 +186,11 @@ class StoreOrdersNotifier extends StateNotifier<StoreOrdersState> {
         deliveryTimeoutMinutes:
             (d['deliveryTimeoutMinutes'] as num? ?? 180).toInt(),
       );
-    } catch (_) {}
+    } catch (e) {
+      if (e is DioException && e.response?.statusCode == 403) {
+        state = state.copyWith(error: 'Bạn không có quyền truy cập quán này');
+      }
+    }
   }
 
   Future<void> fetchOrders() async {
@@ -610,19 +615,24 @@ class _StoreOrdersScreenState extends ConsumerState<StoreOrdersScreen>
     }
 
     if (state.error != null && state.pendingOrders.isEmpty) {
+      final isAccessDenied = state.error!.contains('không có quyền');
       return Scaffold(
         appBar: _buildAppBar(state),
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              const Icon(Icons.lock_outline, size: 48, color: Colors.red),
+              const SizedBox(height: 8),
               Text(state.error!, textAlign: TextAlign.center),
               const SizedBox(height: 12),
               ElevatedButton(
-                onPressed: () => ref
-                    .read(storeOrdersProvider(widget.storeId).notifier)
-                    .refresh(),
-                child: const Text('Thử lại'),
+                onPressed: isAccessDenied
+                    ? () => context.go('/store-dashboard')
+                    : () => ref
+                        .read(storeOrdersProvider(widget.storeId).notifier)
+                        .refresh(),
+                child: Text(isAccessDenied ? 'Quay lại' : 'Thử lại'),
               ),
             ],
           ),

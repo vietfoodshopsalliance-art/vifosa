@@ -1,7 +1,7 @@
 name: vifosa
 description: Viet Food Shops Alliance — đặt đồ ăn TPHCM
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+2
 
 # Spec BR-5: Flutter package name = vifosa
 # Spec TO-1: Flutter 3.x + Dart
@@ -31,9 +31,6 @@ dependencies:
   # Image picker (upload ảnh món, avatar, post)
   image_picker: ^1.1.2
 
-  # Image compress trước upload — Spec TO-5: client compress 10MB → ~2MB
-  flutter_image_compress: ^2.2.0
-
   # Firebase — Spec TO-7: FCM setup tuần 1
   firebase_core: ^2.27.0
   firebase_messaging: ^14.7.19
@@ -53,6 +50,9 @@ dependencies:
   permission_handler: ^11.3.1 # GPS permission
   geolocator: ^11.0.0        # lấy vị trí GPS — Spec 5.1.6
   shared_preferences: ^2.3.0 # lưu recent searches, settings nhỏ
+
+  # Real-time order tracking — Socket.IO
+  socket_io_client: ^2.0.3+1
 
   cupertino_icons: ^1.0.6
 

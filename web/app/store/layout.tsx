@@ -5,6 +5,7 @@ const NAV = [
   { href: '/store/menu',     label: 'Menu' },
   { href: '/store/orders',   label: 'Đơn hàng' },
   { href: '/store/reviews',  label: 'Đánh giá' },
+  { href: '/store/reports',  label: 'Báo cáo' },
   { href: '/store/settings', label: 'Cài đặt' },
 ]
 

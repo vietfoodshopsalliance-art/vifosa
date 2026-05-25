@@ -65,29 +65,25 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       // ── Shell: màn hình có Bottom Navigation Bar ──────────────────────────
-      ShellRoute(
-        builder: (context, state, child) => ScaffoldWithNav(child: child),
-        routes: [
-          GoRoute(
-            path: '/home',
-            builder: (_, __) => const HomeScreen(),
-          ),
-          GoRoute(
-            path: '/search',
-            builder: (_, __) => const SearchScreen(),
-          ),
-          GoRoute(
-            path: '/cart',
-            builder: (_, __) => const CartScreen(),
-          ),
-          GoRoute(
-            path: '/orders',
-            builder: (_, __) => const OrdersScreen(),
-          ),
-          GoRoute(
-            path: '/profile',
-            builder: (_, __) => const ProfileScreen(),
-          ),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            ScaffoldWithNav(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(routes: [
+            GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(path: '/search', builder: (_, __) => const SearchScreen()),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(path: '/cart', builder: (_, __) => const CartScreen()),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(path: '/orders', builder: (_, __) => const OrdersScreen()),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
+          ]),
         ],
       ),
 

@@ -39,7 +39,8 @@ class ProfileScreen extends ConsumerWidget {
     final user = authState.user ?? {};
 
     final roles = (user['roles'] as List<dynamic>? ?? []).cast<String>();
-    final isStoreOwner = roles.contains('store_owner');
+    final ownedStores = (user['ownedStores'] as List<dynamic>? ?? []);
+    final isStoreOwner = roles.contains('store_owner') || ownedStores.isNotEmpty;
     final avatarUrl = user['avatarImage'] as String? ?? user['avatar'] as String?;
     final nickname = user['nickname'] as String? ?? '';
     final username = user['username'] as String? ?? '';

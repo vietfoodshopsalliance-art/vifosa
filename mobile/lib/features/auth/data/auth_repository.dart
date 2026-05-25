@@ -14,11 +14,13 @@ class AuthRepository {
     required String password,
   }) async {
     final res = await _dio.post(ApiEndpoints.register, data: {
-      'username': username,
-      'nickname': nickname,
-      'email':    email,
-      'phone':    phone,
-      'password': password,
+      'username':    username,
+      'nickname':    nickname,
+      'email':       email,
+      'phone':       phone,
+      'password':    password,
+      'tosAccepted': true,
+      'tosVersion':  '1.0',
     });
     final payload = res.data['data'] as Map<String, dynamic>;
     await _saveTokens(payload);

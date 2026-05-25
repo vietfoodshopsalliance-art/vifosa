@@ -42,9 +42,15 @@ Future<LatLng?> _gpsLocation() async {
       return null;
     }
 
+    // Last known position: trả về tức thì từ cache OS, không cần warm-up GPS
+    final last = await Geolocator.getLastKnownPosition();
+    if (last != null && _isInVietnam(last.latitude, last.longitude)) {
+      return LatLng(last.latitude, last.longitude);
+    }
+
     final pos = await Geolocator.getCurrentPosition(
       desiredAccuracy: LocationAccuracy.medium,
-      timeLimit: const Duration(seconds: 8),
+      timeLimit: const Duration(seconds: 3),
     );
     if (_isInVietnam(pos.latitude, pos.longitude)) {
       return LatLng(pos.latitude, pos.longitude);
@@ -60,7 +66,7 @@ Future<LatLng?> _savedAddressLocation(Ref ref) async {
     final client = ref.read(dioClientProvider);
     final res = await client.dio
         .get<Map<String, dynamic>>(ApiEndpoints.myAddresses)
-        .timeout(const Duration(seconds: 5));
+        .timeout(const Duration(seconds: 3));
     final list = (res.data?['addresses'] as List<dynamic>?) ?? [];
     if (list.isEmpty) return null;
 
@@ -85,8 +91,8 @@ Future<LatLng?> _savedAddressLocation(Ref ref) async {
 Future<LatLng?> _ipLocation() async {
   try {
     final dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 5),
-      receiveTimeout: const Duration(seconds: 5),
+      connectTimeout: const Duration(seconds: 3),
+      receiveTimeout: const Duration(seconds: 3),
     ));
     final res = await dio.get<Map<String, dynamic>>('https://ipwho.is/');
     final body = res.data;
