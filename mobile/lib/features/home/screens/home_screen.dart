@@ -44,9 +44,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final isAuth    = authState.isAuthenticated;
     final user      = authState.user;
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: const Color(0xFFF7F7F7),
       body: RefreshIndicator(
-        color: const Color(0xFFE53935),
+        color: const Color(0xFFF4B400),
         onRefresh: _onRefresh,
         child: CustomScrollView(
           controller: _scrollCtrl,
@@ -56,29 +56,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               floating: true,
               snap: true,
               backgroundColor: Colors.white,
-              elevation: 1,
-              titleSpacing: 16,
-              // Issue 6: Search button nằm bên phải logo Vifosa
+              elevation: 0,
+              surfaceTintColor: Colors.transparent,
+              shadowColor: Colors.black12,
+              forceElevated: true,
+              titleSpacing: 14,
               title: Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   Image.asset(
                     'assets/images/vietshop_logo_ngang.png',
-                    height: 14,
+                    height: 22,
                     fit: BoxFit.contain,
                   ),
-                  const SizedBox(width: 10),
-                  // Issue 3 & 6: Search button trái
-                  GestureDetector(
-                    onTap: () => context.go('/search'),
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0F0F0),
-                        borderRadius: BorderRadius.circular(20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => context.go('/search'),
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3F3F3),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          children: const [
+                            Icon(Icons.search_rounded,
+                                color: Colors.black38, size: 18),
+                            SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                'Tìm quán, món ăn...',
+                                style: TextStyle(
+                                    color: Colors.black38, fontSize: 13),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      child: const Icon(Icons.search,
-                          color: Colors.black54, size: 18),
                     ),
                   ),
                 ],
@@ -99,7 +117,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       'Đăng nhập',
                       style: TextStyle(
                         color: Color(0xFFF4B400),
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                         fontSize: 14,
                       ),
                     ),
@@ -108,35 +126,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ],
             ),
 
-            // Issue 7: Ẩn radius selector — auto-expand trong NearbyNotifier
-
             // ── Section 1: Quán mới ───────────────────────────────────
             _SectionSliver(
               title: 'Quán mới',
+              icon: Icons.storefront_rounded,
               provider: newStoresProvider,
             ),
 
-            // ── Section 3: Bán chạy ───────────────────────────────────
+            // ── Section 2: Bán chạy ───────────────────────────────────
             _SectionSliver(
-              title: 'Bán chạy 30 ngày',
+              title: 'Bán chạy',
+              icon: Icons.local_fire_department_rounded,
               provider: popularStoresProvider,
             ),
 
-            // ── Section 4: Đã mua gần đây (logged-in) ────────────────
+            // ── Section 3: Đã mua gần đây (logged-in) ────────────────
             if (isAuth)
               _SectionSliver(
                 title: 'Đã mua gần đây',
+                icon: Icons.history_rounded,
                 provider: recentPurchaseStoresProvider,
               ),
 
-            // ── Section 5: Yêu thích (logged-in) ─────────────────────
+            // ── Section 4: Yêu thích (logged-in) ─────────────────────
             if (isAuth)
               _SectionSliver(
                 title: 'Yêu thích',
+                icon: Icons.favorite_border_rounded,
                 provider: favoriteStoresProvider,
               ),
 
-            // ── Section 6: Quán gần bạn (infinite scroll, auto-radius) ──
+            // ── Section 5: Quán gần bạn (infinite scroll) ────────────
             _NearbySection(),
 
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
@@ -151,13 +171,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-// ── Generic horizontal section (dùng FutureProvider) ─────────────────────────
+// ── Generic horizontal section ────────────────────────────────────────────────
 
 class _SectionSliver extends ConsumerWidget {
   final String title;
+  final IconData icon;
   final ProviderListenable<AsyncValue<List<StoreCard>>> provider;
 
-  const _SectionSliver({required this.title, required this.provider});
+  const _SectionSliver({
+    required this.title,
+    required this.icon,
+    required this.provider,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -174,25 +199,39 @@ class _SectionSliver extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1A1A1A),
-                  ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 3,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF4B400),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(icon, size: 18, color: const Color(0xFFF4B400)),
+                    const SizedBox(width: 6),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1A1A1A),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               SizedBox(
-                height: 196,
+                height: 158,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
-                  padding:
-                      const EdgeInsets.only(left: 16, right: 4, bottom: 4),
+                  padding: const EdgeInsets.only(left: 16, right: 4, bottom: 2),
                   itemCount: stores.length,
                   itemBuilder: (_, i) => StoreCardHorizontal(
                     store: stores[i],
@@ -208,7 +247,7 @@ class _SectionSliver extends ConsumerWidget {
   }
 }
 
-// ── Section 6: Nearby stores (infinite scroll) ───────────────────────────────
+// ── Section: Nearby stores (infinite scroll) ─────────────────────────────────
 
 class _NearbySection extends ConsumerWidget {
   @override
@@ -218,7 +257,7 @@ class _NearbySection extends ConsumerWidget {
     if (state.isLoading) {
       return const SliverFillRemaining(
         child: Center(
-          child: CircularProgressIndicator(color: Color(0xFFE53935)),
+          child: CircularProgressIndicator(color: Color(0xFFF4B400)),
         ),
       );
     }
@@ -232,9 +271,16 @@ class _NearbySection extends ConsumerWidget {
               const Icon(Icons.wifi_off_outlined,
                   size: 56, color: Colors.black26),
               const SizedBox(height: 12),
-              const Text('Không tải được dữ liệu.'),
+              const Text('Không tải được dữ liệu.',
+                  style: TextStyle(color: Colors.black45)),
               const SizedBox(height: 12),
               ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF4B400),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
                 onPressed: () =>
                     ref.read(nearbyStoresProvider.notifier).refresh(),
                 child: const Text('Thử lại'),
@@ -267,13 +313,30 @@ class _NearbySection extends ConsumerWidget {
       slivers: [
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-            child: Text(
-              'Quán gần bạn',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w700),
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 3,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF4B400),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.near_me_rounded,
+                    size: 18, color: Color(0xFFF4B400)),
+                const SizedBox(width: 6),
+                const Text(
+                  'Quán gần bạn',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -296,7 +359,7 @@ class _NearbySection extends ConsumerWidget {
                   height: 24,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Color(0xFFE53935),
+                    color: Color(0xFFF4B400),
                   ),
                 ),
               ),
@@ -307,7 +370,7 @@ class _NearbySection extends ConsumerWidget {
   }
 }
 
-// ── Avatar menu button (AppBar) — Issues 4 & 5 ───────────────────────────────
+// ── Avatar menu button ────────────────────────────────────────────────────────
 
 class _AvatarMenuButton extends ConsumerWidget {
   final Map<String, dynamic>? user;
@@ -318,7 +381,8 @@ class _AvatarMenuButton extends ConsumerWidget {
     final nickname = user?['nickname'] as String? ??
         user?['username'] as String? ??
         '';
-    final avatarUrl = user?['avatarImage'] as String? ?? user?['avatar'] as String?;
+    final avatarUrl =
+        user?['avatarImage'] as String? ?? user?['avatar'] as String?;
 
     return PopupMenuButton<_MenuOption>(
       offset: const Offset(0, 50),
@@ -330,8 +394,8 @@ class _AvatarMenuButton extends ConsumerWidget {
       ),
       itemBuilder: (_) => [
         _menuItem(_MenuOption.profile, Icons.person_outline, 'Profile'),
-        _menuItem(_MenuOption.storeDashboard, Icons.storefront_outlined,
-            'Quản lý quán'),
+        _menuItem(
+            _MenuOption.storeDashboard, Icons.storefront_outlined, 'Quản lý quán'),
         const PopupMenuDivider(),
         _menuItem(_MenuOption.logout, Icons.logout_rounded, 'Thoát',
             destructive: true),
@@ -356,9 +420,7 @@ class _AvatarMenuButton extends ConsumerWidget {
           const SizedBox(width: 10),
           Text(label,
               style: TextStyle(
-                  fontSize: 14,
-                  color: color,
-                  fontWeight: FontWeight.w500)),
+                  fontSize: 14, color: color, fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -366,8 +428,11 @@ class _AvatarMenuButton extends ConsumerWidget {
 
   Widget _buildAvatar(String? url, String nickname) {
     const colors = [
-      Color(0xFF2563EB), Color(0xFF10B981), Color(0xFFF59E0B),
-      Color(0xFFEF4444), Color(0xFF8B5CF6),
+      Color(0xFF2563EB),
+      Color(0xFF10B981),
+      Color(0xFFF4B400),
+      Color(0xFFEF4444),
+      Color(0xFF8B5CF6),
     ];
     if (url != null && url.isNotEmpty) {
       return CircleAvatar(radius: 15, backgroundImage: NetworkImage(url));

@@ -7,14 +7,9 @@ import '../../../core/providers/location_provider.dart';
 import '../models/store_card.dart';
 import '../../auth/providers/auth_provider.dart';
 
-// ── Radius ────────────────────────────────────────────────────────────────────
-
-final selectedRadiusProvider = StateProvider<int>((ref) => 5);
-
-// Radius thực sự có quán — được cập nhật bởi NearbyNotifier khi auto-expand.
-// Tất cả section dùng chung radius này để tránh nhiều API call và đảm bảo
-// "Quán mới" / "Bán chạy" dùng cùng dữ liệu với "Quán gần bạn".
-final effectiveRadiusProvider = StateProvider<int>((ref) => 5);
+// Radius cố định 25km — đủ bao phủ nội thành TP.HCM.
+// Tăng lên khi DB có nhiều store hơn và cần thu hẹp vùng.
+const _defaultRadius = 25;
 
 // ── Single /home-feed call ────────────────────────────────────────────────────
 
@@ -33,31 +28,22 @@ final homeFeedDataProvider =
 });
 
 // ── Section providers derived from the single feed ────────────────────────────
-// Tất cả dùng effectiveRadiusProvider để dùng chung 1 API call với NearbySection.
 
 final newStoresProvider =
-    Provider<AsyncValue<List<StoreCard>>>((ref) {
-  final radius = ref.watch(effectiveRadiusProvider);
-  return ref.watch(homeFeedDataProvider(radius)).whenData((d) => d.newStores);
-});
+    Provider<AsyncValue<List<StoreCard>>>((ref) =>
+        ref.watch(homeFeedDataProvider(_defaultRadius)).whenData((d) => d.newStores));
 
 final popularStoresProvider =
-    Provider<AsyncValue<List<StoreCard>>>((ref) {
-  final radius = ref.watch(effectiveRadiusProvider);
-  return ref.watch(homeFeedDataProvider(radius)).whenData((d) => d.trendingStores);
-});
+    Provider<AsyncValue<List<StoreCard>>>((ref) =>
+        ref.watch(homeFeedDataProvider(_defaultRadius)).whenData((d) => d.trendingStores));
 
 final recentPurchaseStoresProvider =
-    Provider<AsyncValue<List<StoreCard>>>((ref) {
-  final radius = ref.watch(effectiveRadiusProvider);
-  return ref.watch(homeFeedDataProvider(radius)).whenData((d) => d.recentPurchases);
-});
+    Provider<AsyncValue<List<StoreCard>>>((ref) =>
+        ref.watch(homeFeedDataProvider(_defaultRadius)).whenData((d) => d.recentPurchases));
 
 final favoriteStoresProvider =
-    Provider<AsyncValue<List<StoreCard>>>((ref) {
-  final radius = ref.watch(effectiveRadiusProvider);
-  return ref.watch(homeFeedDataProvider(radius)).whenData((d) => d.favorites);
-});
+    Provider<AsyncValue<List<StoreCard>>>((ref) =>
+        ref.watch(homeFeedDataProvider(_defaultRadius)).whenData((d) => d.favorites));
 
 // ── Nearby section: infinite scroll (load-more via cursor) ───────────────────
 
@@ -97,13 +83,8 @@ class NearbyState {
 }
 
 class NearbyNotifier extends StateNotifier<NearbyState> {
-  static const _radii = [5, 10, 25];
-
   NearbyNotifier(this._ref) : super(const NearbyState()) {
-    _init(5);
-    // Khi auth settle (guest→logged in hoặc logout), refetch để lấy
-    // favorites / recentPurchases đúng user. Dùng listen thay vì watch
-    // trong homeFeedDataProvider để tránh provider bị restart mid-load.
+    _init();
     _ref.listen<bool>(
       authProvider.select((s) => s.isAuthenticated),
       (prev, next) {
@@ -113,47 +94,25 @@ class NearbyNotifier extends StateNotifier<NearbyState> {
   }
 
   final Ref _ref;
-  int _effectiveRadius = 5;
 
-  // Tự động mở rộng bán kính 5→10→25 khi không có quán.
-  // Cập nhật effectiveRadiusProvider để các section khác dùng cùng radius.
-  Future<void> _init(int startRadius) async {
+  Future<void> _init() async {
     state = const NearbyState(isLoading: true);
-    // Reset về startRadius ngay lập tức để tránh flash dữ liệu cũ từ lần trước
-    _ref.read(effectiveRadiusProvider.notifier).state = startRadius;
-
-    final startIdx = _radii.indexOf(startRadius).clamp(0, _radii.length - 1);
-
-    for (int i = startIdx; i < _radii.length; i++) {
-      final radius = _radii[i];
-      try {
-        final data = await _ref.read(homeFeedDataProvider(radius).future);
-        if (data.nearbyStores.isNotEmpty || i == _radii.length - 1) {
-          _effectiveRadius = radius;
-          // Cập nhật để newStores / trendingStores dùng cùng radius
-          _ref.read(effectiveRadiusProvider.notifier).state = radius;
-          state = NearbyState(
-            stores: data.nearbyStores,
-            isLoading: false,
-            hasMore: data.hasMore,
-            nextCursor: data.nextCursor,
-          );
-          return;
-        }
-        // nearbyStores rỗng → thử bán kính lớn hơn
-      } catch (e) {
-        state = NearbyState(isLoading: false, error: e.toString());
-        return;
-      }
+    try {
+      final data = await _ref.read(homeFeedDataProvider(_defaultRadius).future);
+      state = NearbyState(
+        stores: data.nearbyStores,
+        isLoading: false,
+        hasMore: data.hasMore,
+        nextCursor: data.nextCursor,
+      );
+    } catch (e) {
+      state = NearbyState(isLoading: false, error: e.toString());
     }
   }
 
   Future<void> refresh() async {
-    for (final r in _radii) {
-      _ref.invalidate(homeFeedDataProvider(r));
-    }
-    _effectiveRadius = 5;
-    await _init(5);
+    _ref.invalidate(homeFeedDataProvider(_defaultRadius));
+    await _init();
   }
 
   Future<void> loadMore() async {
@@ -162,14 +121,13 @@ class NearbyNotifier extends StateNotifier<NearbyState> {
 
     state = state.copyWith(isLoadingMore: true);
     try {
-      final radius = _effectiveRadius;
       final loc = await _ref.read(locationProvider.future);
       final res = await _ref.read(dioClientProvider).dio.get(
         '/home-feed',
         queryParameters: {
           'lat': loc.lat,
           'lng': loc.lng,
-          'radius': radius,
+          'radius': _defaultRadius,
           'cursor': state.nextCursor,
         },
       );

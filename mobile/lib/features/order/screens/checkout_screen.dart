@@ -683,7 +683,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   String _pmLabel(String method) => switch (method) {
     'cod'           => 'Tiền mặt khi nhận hàng (COD)',
     'bank_transfer' => 'Chuyển khoản ngân hàng',
-    'fifty_fifty'   => '50/50 (nửa tiền mặt, nửa chuyển khoản)',
+    'fifty_fifty'   => '50/50 (CK trước 50%, CK sau khi nhận hàng 50%)',
     _               => method,
   };
 

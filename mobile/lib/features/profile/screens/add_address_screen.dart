@@ -1,14 +1,19 @@
 // vifosa/mobile/lib/features/profile/screens/add_address_screen.dart
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import '../models/address_model.dart';
 import '../providers/profile_providers.dart';
 
+enum _CoordMethod { address, gps, fullLink, shortLink }
+
 class AddAddressScreen extends ConsumerStatefulWidget {
-  const AddAddressScreen({super.key});
+  final AddressModel? initialAddress;
+  const AddAddressScreen({super.key, this.initialAddress});
 
   @override
   ConsumerState<AddAddressScreen> createState() => _AddAddressScreenState();
@@ -17,151 +22,216 @@ class AddAddressScreen extends ConsumerStatefulWidget {
 class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
   final _labelCtrl         = TextEditingController();
   final _textCtrl          = TextEditingController();
-  final _mapsLinkCtrl      = TextEditingController();
+  final _coordInputCtrl    = TextEditingController();
   final _receiverNameCtrl  = TextEditingController();
   final _receiverPhoneCtrl = TextEditingController();
-  final _latCtrl           = TextEditingController();
-  final _lngCtrl           = TextEditingController();
 
   double? _lat;
   double? _lng;
-  bool _saving     = false;
-  bool _gpsLoading = false;
+  bool _saving       = false;
+  bool _coordLoading = false;
+  _CoordMethod _method = _CoordMethod.address;
+
+  @override
+  void initState() {
+    super.initState();
+    final a = widget.initialAddress;
+    if (a != null) {
+      _labelCtrl.text         = a.label;
+      _textCtrl.text          = a.text;
+      _receiverNameCtrl.text  = a.receiverName;
+      _receiverPhoneCtrl.text = a.receiverPhone;
+      _lat = a.lat;
+      _lng = a.lng;
+    }
+  }
 
   @override
   void dispose() {
     _labelCtrl.dispose();
     _textCtrl.dispose();
-    _mapsLinkCtrl.dispose();
+    _coordInputCtrl.dispose();
     _receiverNameCtrl.dispose();
     _receiverPhoneCtrl.dispose();
-    _latCtrl.dispose();
-    _lngCtrl.dispose();
     super.dispose();
   }
 
-  // ── GPS ──────────────────────────────────────────────────────────────────
+  // ── Coordinate resolution ─────────────────────────────────────────────────
 
-  Future<void> _getCurrentLocation() async {
-    setState(() => _gpsLoading = true);
+  Future<void> _resolveCoords() async {
+    setState(() => _coordLoading = true);
     try {
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Cần cấp quyền GPS để lấy vị trí')),
-          );
-        }
-        return;
-      }
-
-      final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      setState(() {
-        _lat = pos.latitude;
-        _lng = pos.longitude;
-        _latCtrl.text = _lat!.toStringAsFixed(6);
-        _lngCtrl.text = _lng!.toStringAsFixed(6);
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không lấy được vị trí: $e')),
-        );
+      switch (_method) {
+        case _CoordMethod.address:
+          await _geocodeAddress();
+        case _CoordMethod.gps:
+          await _resolveGps();
+        case _CoordMethod.fullLink:
+          _parseFullLink(_coordInputCtrl.text.trim());
+        case _CoordMethod.shortLink:
+          await _resolveShortLink(_coordInputCtrl.text.trim());
       }
     } finally {
-      if (mounted) setState(() => _gpsLoading = false);
+      if (mounted) setState(() => _coordLoading = false);
     }
   }
 
-  // ── Parse Google Maps link ────────────────────────────────────────────────
+  Future<void> _geocodeAddress() async {
+    final q = _textCtrl.text.trim();
+    if (q.isEmpty) { _showSnack('Nhập địa chỉ trước'); return; }
+    try {
+      final res = await Dio().get(
+        'https://nominatim.openstreetmap.org/search',
+        queryParameters: {'q': q, 'format': 'json', 'limit': '1'},
+        options: Options(headers: {'User-Agent': 'VifosaApp/1.0'}),
+      );
+      final list = res.data as List;
+      if (list.isEmpty) { _showSnack('Không tìm thấy địa chỉ, thử cách khác'); return; }
+      if (mounted) {
+        setState(() {
+          _lat = double.parse(list[0]['lat'] as String);
+          _lng = double.parse(list[0]['lon'] as String);
+        });
+      }
+    } catch (_) {
+      _showSnack('Không thể tìm địa chỉ, thử cách khác');
+    }
+  }
 
-  void _parseMapsLink() {
-    final url = _mapsLinkCtrl.text.trim();
+  Future<void> _resolveGps() async {
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      _showSnack('Cần cấp quyền GPS để lấy vị trí');
+      return;
+    }
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      if (mounted) setState(() { _lat = pos.latitude; _lng = pos.longitude; });
+    } catch (e) {
+      _showSnack('Không lấy được vị trí: $e');
+    }
+  }
+
+  void _parseFullLink(String url) {
+    if (url.isEmpty) { _showSnack('Paste link Google Maps trước'); return; }
     final latLng = _extractLatLng(url);
     if (latLng != null) {
-      setState(() {
-        _lat = latLng.$1;
-        _lng = latLng.$2;
-        _latCtrl.text = _lat!.toStringAsFixed(6);
-        _lngCtrl.text = _lng!.toStringAsFixed(6);
-      });
+      setState(() { _lat = latLng.$1; _lng = latLng.$2; });
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Không thể parse toạ độ từ link này')),
-      );
+      _showSnack('Không tìm thấy toạ độ trong link này');
+    }
+  }
+
+  Future<void> _resolveShortLink(String url) async {
+    if (url.isEmpty) { _showSnack('Paste link rút gọn trước'); return; }
+    try {
+      final dio = Dio(BaseOptions(
+        followRedirects: false,
+        validateStatus: (_) => true,
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+      ));
+      String current = url;
+      for (int i = 0; i < 6; i++) {
+        final res = await dio.get(current);
+        final status = res.statusCode ?? 0;
+        if (status >= 300 && status < 400) {
+          final location = res.headers['location']?.first;
+          if (location == null) break;
+          current = Uri.parse(current).resolve(location).toString();
+          final latLng = _extractLatLng(current);
+          if (latLng != null) {
+            if (mounted) setState(() { _lat = latLng.$1; _lng = latLng.$2; });
+            return;
+          }
+        } else {
+          break;
+        }
+      }
+      final latLng = _extractLatLng(current);
+      if (latLng != null) {
+        if (mounted) setState(() { _lat = latLng.$1; _lng = latLng.$2; });
+      } else {
+        _showSnack('Không giải được toạ độ từ link này');
+      }
+    } catch (e) {
+      _showSnack('Lỗi khi xử lý link: $e');
     }
   }
 
   (double, double)? _extractLatLng(String url) {
-    // Pattern 1: ?q=lat,lng
-    final q = RegExp(r'[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)').firstMatch(url);
+    // ?q=lat,lng  or  ll=lat,lng
+    final q = RegExp(r'[?&](?:q|ll)=(-?\d+\.?\d*),(-?\d+\.?\d*)').firstMatch(url);
     if (q != null) return (double.parse(q.group(1)!), double.parse(q.group(2)!));
-    // Pattern 2: @lat,lng,
+    // @lat,lng,zoom
     final at = RegExp(r'@(-?\d+\.?\d*),(-?\d+\.?\d*),').firstMatch(url);
     if (at != null) return (double.parse(at.group(1)!), double.parse(at.group(2)!));
-    // Pattern 3: /place/.../lat,lng
+    // /place/.../lat,lng
     final place = RegExp(r'place/[^/]+/(-?\d+\.?\d*),(-?\d+\.?\d*)').firstMatch(url);
     if (place != null) return (double.parse(place.group(1)!), double.parse(place.group(2)!));
+    // !3d lat !4d lng  (encoded place URLs)
+    final d3 = RegExp(r'!3d(-?\d+\.?\d*)').firstMatch(url);
+    final d4 = RegExp(r'!4d(-?\d+\.?\d*)').firstMatch(url);
+    if (d3 != null && d4 != null) {
+      return (double.parse(d3.group(1)!), double.parse(d4.group(1)!));
+    }
     return null;
   }
 
-  void _applyManualCoords() {
-    final lat = double.tryParse(_latCtrl.text);
-    final lng = double.tryParse(_lngCtrl.text);
-    if (lat != null && lng != null) setState(() { _lat = lat; _lng = lng; });
+  void _showSnack(String msg) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    }
   }
 
   // ── Save ──────────────────────────────────────────────────────────────────
 
   Future<void> _save() async {
     if (_lat == null || _lng == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cần chọn toạ độ trước')),
-      );
+      _showSnack('Cần lấy toạ độ trước');
       return;
     }
     if (_textCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cần nhập địa chỉ')),
-      );
+      _showSnack('Cần nhập địa chỉ');
       return;
     }
-    if (_receiverNameCtrl.text.trim().isEmpty || _receiverPhoneCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cần nhập thông tin người nhận')),
-      );
+    if (_receiverNameCtrl.text.trim().isEmpty ||
+        _receiverPhoneCtrl.text.trim().isEmpty) {
+      _showSnack('Cần nhập thông tin người nhận');
       return;
     }
 
     setState(() => _saving = true);
+    final payload = {
+      'label': _labelCtrl.text.trim(),
+      'address': {
+        'text': _textCtrl.text.trim(),
+        'location': {
+          'type': 'Point',
+          'coordinates': [_lng, _lat],
+        },
+      },
+      'receiver': {
+        'name': _receiverNameCtrl.text.trim(),
+        'phone': _receiverPhoneCtrl.text.trim(),
+      },
+    };
     try {
-      await ref.read(addressNotifierProvider.notifier).add({
-        'label': _labelCtrl.text.trim(),
-        'address': {
-          'text': _textCtrl.text.trim(),
-          'location': {
-            'type': 'Point',
-            'coordinates': [_lng, _lat], // [lng, lat]
-          },
-        },
-        'receiver': {
-          'name': _receiverNameCtrl.text.trim(),
-          'phone': _receiverPhoneCtrl.text.trim(),
-        },
-      });
+      final notifier = ref.read(addressNotifierProvider.notifier);
+      if (widget.initialAddress != null) {
+        await notifier.update(widget.initialAddress!.id, payload);
+      } else {
+        await notifier.add(payload);
+      }
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lưu thất bại: $e')),
-        );
-      }
+      if (mounted) _showSnack('Lưu thất bại: $e');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -173,7 +243,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Thêm địa chỉ'),
+        title: Text(widget.initialAddress != null ? 'Sửa địa chỉ' : 'Thêm địa chỉ'),
         actions: [
           TextButton(
             onPressed: _saving ? null : _save,
@@ -186,91 +256,55 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                // ── Nhãn & địa chỉ text ───────────────────────────────────
+                // ── Nhãn & địa chỉ ────────────────────────────────────────
                 _field('Nhãn (vd: Nhà, Công ty)', _labelCtrl),
                 const SizedBox(height: 12),
-                _field('Địa chỉ (text)', _textCtrl),
+                _field('Địa chỉ (mô tả để giao hàng)', _textCtrl),
 
-                const SizedBox(height: 20),
-                const Text('Toạ độ', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                const SizedBox(height: 4),
+                const SizedBox(height: 24),
+
+                // ── Toạ độ ────────────────────────────────────────────────
                 const Text(
-                  'Chọn 1 trong 3 cách: GPS, paste link Google Maps, hoặc nhập thủ công.',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                  'Toạ độ',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
                 ),
                 const SizedBox(height: 10),
 
-                // ── GPS button ────────────────────────────────────────────
+                _MethodSelector(
+                  selected: _method,
+                  onChanged: (m) => setState(() {
+                    _method = m;
+                    _coordInputCtrl.clear();
+                  }),
+                ),
+
+                const SizedBox(height: 12),
+
+                _buildMethodInput(),
+
+                const SizedBox(height: 12),
+
                 SizedBox(
                   height: 44,
                   child: ElevatedButton.icon(
-                    icon: _gpsLoading
+                    icon: _coordLoading
                         ? const SizedBox(
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
                           )
-                        : const Icon(Icons.my_location),
-                    label: Text(_gpsLoading ? 'Đang lấy vị trí...' : 'Dùng vị trí hiện tại (GPS)'),
+                        : const Icon(Icons.location_searching),
+                    label: Text(
+                        _coordLoading ? 'Đang lấy toạ độ...' : 'Lấy toạ độ'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                      backgroundColor: Colors.orange,
                       foregroundColor: Colors.white,
                     ),
-                    onPressed: _gpsLoading ? null : _getCurrentLocation,
+                    onPressed: _coordLoading ? null : _resolveCoords,
                   ),
                 ),
 
-                const SizedBox(height: 12),
-                const Row(
-                  children: [
-                    Expanded(child: Divider()),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Text('hoặc', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                    ),
-                    Expanded(child: Divider()),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // ── Google Maps link ──────────────────────────────────────
-                Row(
-                  children: [
-                    Expanded(child: _field('Paste link Google Maps', _mapsLinkCtrl)),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: _parseMapsLink,
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                      child: const Text('Parse'),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 12),
-                const Row(
-                  children: [
-                    Expanded(child: Divider()),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Text('hoặc nhập thủ công', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                    ),
-                    Expanded(child: Divider()),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                // ── Manual lat/lng ────────────────────────────────────────
-                Row(
-                  children: [
-                    Expanded(child: _field('Lat', _latCtrl, TextInputType.number)),
-                    const SizedBox(width: 8),
-                    Expanded(child: _field('Lng', _lngCtrl, TextInputType.number)),
-                    const SizedBox(width: 8),
-                    TextButton(onPressed: _applyManualCoords, child: const Text('Áp dụng')),
-                  ],
-                ),
-
-                // ── Map preview ───────────────────────────────────────────
                 if (_lat != null && _lng != null) ...[
                   const SizedBox(height: 12),
                   ClipRRect(
@@ -284,7 +318,8 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
                         ),
                         children: [
                           TileLayer(
-                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            urlTemplate:
+                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                             userAgentPackageName: 'com.vifosa.app',
                           ),
                           MarkerLayer(
@@ -310,26 +345,120 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
                 ],
 
                 // ── Người nhận ────────────────────────────────────────────
-                const SizedBox(height: 20),
-                const Text('Người nhận', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                const SizedBox(height: 24),
+                const Text(
+                  'Người nhận',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                ),
                 const SizedBox(height: 8),
                 _field('Tên người nhận', _receiverNameCtrl),
                 const SizedBox(height: 8),
-                _field('Số điện thoại', _receiverPhoneCtrl, TextInputType.phone),
+                _field('Số điện thoại', _receiverPhoneCtrl,
+                    TextInputType.phone),
                 const SizedBox(height: 24),
               ],
             ),
     );
   }
 
-  Widget _field(String hint, TextEditingController ctrl, [TextInputType? kbType]) =>
+  Widget _buildMethodInput() {
+    switch (_method) {
+      case _CoordMethod.address:
+        return const Text(
+          'Dùng nội dung "Địa chỉ" đã nhập ở trên để tìm kiếm toạ độ.',
+          style: TextStyle(fontSize: 12, color: Colors.grey),
+        );
+      case _CoordMethod.gps:
+        return const Text(
+          'Sẽ dùng vị trí GPS hiện tại của thiết bị.',
+          style: TextStyle(fontSize: 12, color: Colors.grey),
+        );
+      case _CoordMethod.fullLink:
+        return _field(
+            'Paste link Google Maps (chứa lat/lng)', _coordInputCtrl);
+      case _CoordMethod.shortLink:
+        return _field(
+            'Paste link rút gọn (maps.app.goo.gl/...)', _coordInputCtrl);
+    }
+  }
+
+  Widget _field(String hint, TextEditingController ctrl,
+          [TextInputType? kbType]) =>
       TextField(
         controller: ctrl,
         keyboardType: kbType,
         decoration: InputDecoration(
           hintText: hint,
           border: const OutlineInputBorder(),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         ),
       );
+}
+
+// ── Method Selector ───────────────────────────────────────────────────────────
+
+class _MethodSelector extends StatelessWidget {
+  final _CoordMethod selected;
+  final ValueChanged<_CoordMethod> onChanged;
+
+  const _MethodSelector({required this.selected, required this.onChanged});
+
+  static const _items = [
+    (_CoordMethod.address, Icons.search, 'Địa chỉ'),
+    (_CoordMethod.gps, Icons.my_location, 'GPS'),
+    (_CoordMethod.fullLink, Icons.link, 'Link Maps'),
+    (_CoordMethod.shortLink, Icons.open_in_new, 'Link rút gọn'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: _items.map((item) {
+        final isSelected = selected == item.$1;
+        return Expanded(
+          child: GestureDetector(
+            onTap: () => onChanged(item.$1),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.orange : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isSelected
+                      ? Colors.orange
+                      : Colors.grey.shade300,
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    item.$2,
+                    size: 18,
+                    color: isSelected ? Colors.white : Colors.grey,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item.$3,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isSelected
+                          ? Colors.white
+                          : Colors.grey.shade700,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
 }

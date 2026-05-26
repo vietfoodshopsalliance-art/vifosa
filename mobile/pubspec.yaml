@@ -29,7 +29,7 @@ dependencies:
   cached_network_image: ^3.3.1
 
   # Image picker (upload ảnh món, avatar, post)
-  image_picker: ^1.1.2
+  image_picker: ^1.1.4
 
   # Firebase — Spec TO-7: FCM setup tuần 1
   firebase_core: ^2.27.0
@@ -45,11 +45,11 @@ dependencies:
   # Utility
   intl: ^0.19.0              # format giá tiền VNĐ, ngày giờ
   url_launcher: ^6.2.5       # mở link Google Maps, Zalo deep link
-  share_plus: ^9.0.0         # chia sẻ link tracking khách vãng lai
+  share_plus: ^10.0.0        # chia sẻ link tracking khách vãng lai
   qr_flutter: ^4.1.0         # QR code tracking — Spec 5.2
   permission_handler: ^11.3.1 # GPS permission
   geolocator: ^11.0.0        # lấy vị trí GPS — Spec 5.1.6
-  shared_preferences: ^2.3.0 # lưu recent searches, settings nhỏ
+  shared_preferences: ^2.3.3 # lưu recent searches, settings nhỏ
 
   # Real-time order tracking — Socket.IO
   socket_io_client: ^2.0.3+1

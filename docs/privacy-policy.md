@@ -64,7 +64,7 @@ Chúng tôi **không** bán thông tin cá nhân của bạn. Chúng tôi chỉ 
 - **Cửa hàng bán hàng:** Tên, số điện thoại, địa chỉ giao hàng cần thiết để xử lý đơn hàng.
 - **Đối tác giao hàng:** Thông tin giao hàng cần thiết để hoàn tất đơn.
 - **Nhà cung cấp thanh toán:** Thông tin giao dịch để xử lý thanh toán an toàn.
-- **Nhà cung cấp dịch vụ kỹ thuật:** Dịch vụ lưu trữ (Render, Vercel, MongoDB Atlas) theo hợp đồng bảo mật dữ liệu.
+- **Nhà cung cấp dịch vụ kỹ thuật:** Dịch vụ lưu trữ theo hợp đồng bảo mật dữ liệu.
 - **Yêu cầu pháp lý:** Khi được yêu cầu bởi cơ quan có thẩm quyền theo quy định pháp luật hiện hành.
 
 ---

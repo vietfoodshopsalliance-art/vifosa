@@ -47,6 +47,7 @@ class _StoreOrderDetailScreenState
   // Review state
   Map<String, dynamic>? _orderReviews;
   bool _reviewLoading = false;
+  bool _reviewFetchError = false;
 
   @override
   void initState() {
@@ -60,12 +61,20 @@ class _StoreOrderDetailScreenState
     if (widget.storeId == null) return;
     final o = widget.order;
     if (!['delivered', 'completed'].contains(o.mainStatus)) return;
-    setState(() => _reviewLoading = true);
+    setState(() {
+      _reviewLoading = true;
+      _reviewFetchError = false;
+    });
     try {
       final res = await DioClient.instance.get(ApiEndpoints.orderReviews(o.id));
-      if (mounted) setState(() => _orderReviews = res.data as Map<String, dynamic>);
+      if (mounted) {
+        setState(() {
+          _orderReviews = res.data as Map<String, dynamic>;
+          _reviewFetchError = false;
+        });
+      }
     } catch (_) {
-      // ignore — button simply won't show
+      if (mounted) setState(() => _reviewFetchError = true);
     } finally {
       if (mounted) setState(() => _reviewLoading = false);
     }
@@ -360,26 +369,44 @@ class _StoreOrderDetailScreenState
               title: 'Đánh giá khách hàng',
               child: _reviewLoading
                   ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
-                  : _existingCustomerReview != null
-                      ? _ExistingCustomerReview(review: _existingCustomerReview!)
-                      : _canReviewCustomer
-                          ? SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton.icon(
-                                icon: const Icon(Icons.star_border, size: 18),
-                                label: const Text('Đánh giá khách hàng'),
-                                onPressed: () => showDialog(
-                                  context: context,
-                                  builder: (_) => CustomerReviewDialog(
-                                    onSubmit: _submitCustomerReview,
-                                  ),
-                                ),
+                  : _reviewFetchError
+                      ? Row(
+                          children: [
+                            const Icon(Icons.warning_amber_rounded,
+                                size: 16, color: Colors.orange),
+                            const SizedBox(width: 6),
+                            const Expanded(
+                              child: Text(
+                                'Không tải được thông tin đánh giá',
+                                style: TextStyle(fontSize: 12, color: Colors.grey),
                               ),
-                            )
-                          : const Text(
-                              'Không thể đánh giá (đã quá 30 ngày)',
-                              style: TextStyle(fontSize: 12, color: Colors.grey),
                             ),
+                            TextButton(
+                              onPressed: _fetchOrderReviews,
+                              child: const Text('Thử lại'),
+                            ),
+                          ],
+                        )
+                      : _existingCustomerReview != null
+                          ? _ExistingCustomerReview(review: _existingCustomerReview!)
+                          : _canReviewCustomer
+                              ? SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
+                                    icon: const Icon(Icons.star_border, size: 18),
+                                    label: const Text('Đánh giá khách hàng'),
+                                    onPressed: () => showDialog(
+                                      context: context,
+                                      builder: (_) => CustomerReviewDialog(
+                                        onSubmit: _submitCustomerReview,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : const Text(
+                                  'Không thể đánh giá (đã quá 30 ngày)',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                                ),
             ),
             const SizedBox(height: 12),
           ],

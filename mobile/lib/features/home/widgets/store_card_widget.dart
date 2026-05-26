@@ -19,16 +19,16 @@ class StoreCardHorizontal extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 160,
+        width: 175,
         margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -36,54 +36,104 @@ class StoreCardHorizontal extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _CoverImage(
-                url: store.coverImage ?? store.avatarImage, height: 100),
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    store.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 13),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.star_rounded,
-                          size: 13, color: Color(0xFFFFA000)),
-                      const SizedBox(width: 2),
-                      Text(
-                        store.avgRating > 0
-                            ? store.avgRating.toStringAsFixed(1)
-                            : '—',
-                        style: const TextStyle(
-                            fontSize: 12, color: Colors.black54),
+            // Image with gradient overlay showing store name + badge
+            Stack(
+              children: [
+                _CoverImage(
+                  url: store.coverImage ?? store.avatarImage,
+                  height: 115,
+                ),
+                // Gradient at bottom of image
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.72),
+                          Colors.transparent,
+                        ],
                       ),
-                      if (store.totalReviews > 0) ...[
-                        const SizedBox(width: 2),
-                        Text(
-                          '(${store.totalReviews})',
+                    ),
+                  ),
+                ),
+                // Store name and open badge overlaid on image
+                Positioned(
+                  bottom: 8,
+                  left: 8,
+                  right: 8,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          store.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              fontSize: 11, color: Colors.black38),
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black54,
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
-                      const Spacer(),
+                      ),
+                      const SizedBox(width: 6),
                       _OpenBadge(open: store.effectivelyOpen),
                     ],
                   ),
-                  if (store.distanceKm != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        '${store.distanceKm!.toStringAsFixed(1)} km',
-                        style: const TextStyle(
-                            fontSize: 11, color: Colors.black38),
-                      ),
+                ),
+              ],
+            ),
+            // Rating + distance strip
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.star_rounded,
+                    size: 14,
+                    color: Color(0xFFF4B400),
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    store.avgRating > 0
+                        ? store.avgRating.toStringAsFixed(1)
+                        : '—',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
                     ),
+                  ),
+                  if (store.totalReviews > 0) ...[
+                    const SizedBox(width: 2),
+                    Text(
+                      '(${store.totalReviews})',
+                      style: const TextStyle(fontSize: 11, color: Colors.black38),
+                    ),
+                  ],
+                  if (store.distanceKm != null) ...[
+                    const Spacer(),
+                    const Icon(Icons.near_me_outlined,
+                        size: 12, color: Colors.black38),
+                    const SizedBox(width: 2),
+                    Text(
+                      '${store.distanceKm!.toStringAsFixed(1)} km',
+                      style: const TextStyle(
+                          fontSize: 11, color: Colors.black45),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -107,14 +157,14 @@ class StoreCardVertical extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          color: Colors.white,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 6,
+              blurRadius: 8,
               offset: const Offset(0, 2),
             ),
           ],
@@ -122,24 +172,24 @@ class StoreCardVertical extends StatelessWidget {
         clipBehavior: Clip.hardEdge,
         child: Row(
           children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                bottomLeft: Radius.circular(12),
-              ),
+            // Square thumbnail
+            SizedBox(
+              width: 90,
+              height: 90,
               child: _CoverImage(
                 url: store.coverImage ?? store.avatarImage,
-                height: 80,
-                width: 100,
-                isThumb: false,
+                height: 90,
+                width: 90,
+                isThumb: true,
               ),
             ),
+            // Info
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Row(
                       children: [
@@ -149,32 +199,48 @@ class StoreCardVertical extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                                fontWeight: FontWeight.w600, fontSize: 14),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: Colors.black87,
+                            ),
                           ),
                         ),
+                        const SizedBox(width: 6),
                         _OpenBadge(open: store.effectivelyOpen),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      store.addressText,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 12, color: Colors.black54),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        const Icon(Icons.place_outlined,
+                            size: 12, color: Colors.black38),
+                        const SizedBox(width: 2),
+                        Expanded(
+                          child: Text(
+                            store.addressText,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 12, color: Colors.black45),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 5),
                     Row(
                       children: [
                         const Icon(Icons.star_rounded,
-                            size: 13, color: Color(0xFFFFA000)),
-                        const SizedBox(width: 2),
+                            size: 13, color: Color(0xFFF4B400)),
+                        const SizedBox(width: 3),
                         Text(
                           store.avgRating > 0
                               ? store.avgRating.toStringAsFixed(1)
                               : '—',
                           style: const TextStyle(
-                              fontSize: 12, color: Colors.black54),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
                         ),
                         if (store.totalReviews > 0) ...[
                           const SizedBox(width: 2),
@@ -186,12 +252,16 @@ class StoreCardVertical extends StatelessWidget {
                         ],
                         if (store.distanceKm != null) ...[
                           const Spacer(),
-                          const Icon(Icons.place_outlined,
-                              size: 13, color: Colors.black38),
+                          const Icon(Icons.near_me_outlined,
+                              size: 12, color: Color(0xFFF4B400)),
+                          const SizedBox(width: 2),
                           Text(
                             '${store.distanceKm!.toStringAsFixed(1)} km',
                             style: const TextStyle(
-                                fontSize: 11, color: Colors.black38),
+                              fontSize: 12,
+                              color: Colors.black54,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ],
                       ],
@@ -227,9 +297,13 @@ class _CoverImage extends StatelessWidget {
     final fallback = Container(
       width: width,
       height: height,
-      color: const Color(0xFFF5F5F5),
-      child: const Center(
-        child: Icon(Icons.restaurant, color: Colors.black26, size: 28),
+      color: const Color(0xFFFFF8E1),
+      child: Center(
+        child: Icon(
+          Icons.storefront_outlined,
+          color: const Color(0xFFF4B400).withValues(alpha: 0.5),
+          size: 30,
+        ),
       ),
     );
 
@@ -291,9 +365,9 @@ class _ShimmerBoxState extends State<_ShimmerBox>
             begin: Alignment(-1 + 2 * _ctrl.value, 0),
             end: Alignment(0 + 2 * _ctrl.value, 0),
             colors: const [
-              Color(0xFFE0E0E0),
-              Color(0xFFF5F5F5),
-              Color(0xFFE0E0E0),
+              Color(0xFFEEEEEE),
+              Color(0xFFFAFAFA),
+              Color(0xFFEEEEEE),
             ],
             stops: const [0.0, 0.5, 1.0],
           ),
@@ -310,19 +384,19 @@ class _OpenBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(4),
-        color: open ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
+        borderRadius: BorderRadius.circular(6),
+        color: open
+            ? const Color(0xFFF4B400).withValues(alpha: 0.15)
+            : Colors.black.withValues(alpha: 0.08),
       ),
       child: Text(
         open ? 'Mở' : 'Đóng',
         style: TextStyle(
           fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: open
-              ? const Color(0xFF388E3C)
-              : const Color(0xFFE53935),
+          fontWeight: FontWeight.w700,
+          color: open ? const Color(0xFFB8860B) : Colors.black45,
         ),
       ),
     );

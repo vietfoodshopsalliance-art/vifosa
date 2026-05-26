@@ -8,6 +8,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/network/socket_client.dart';
@@ -398,6 +399,8 @@ class _StoreOrdersScreenState extends ConsumerState<StoreOrdersScreen>
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 3, vsync: this);
+    SharedPreferences.getInstance()
+        .then((p) => p.setString('last_store_id', widget.storeId));
   }
 
   @override
@@ -677,62 +680,113 @@ class _StoreSwitcher extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final storesAsync = ref.watch(_myStoresListProvider);
+    final stores = storesAsync.valueOrNull ?? <_SimpleStore>[];
+    final isLoading = storesAsync.isLoading;
 
-    return GestureDetector(
-      onTap: () => storesAsync.whenData((stores) {
-        if (stores.length <= 1) return;
-        _showSwitcher(context, stores);
-      }),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Flexible(
-            child: Text(
-              storeName.isEmpty ? 'Cửa hàng' : storeName,
-              style: const TextStyle(
-                  fontWeight: FontWeight.w700, fontSize: 16),
-              overflow: TextOverflow.ellipsis,
+    return PopupMenuButton<String>(
+      offset: const Offset(0, 42),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 4,
+      enabled: !isLoading,
+      onSelected: (value) {
+        if (value == '__create__') {
+          context.push('/store/create');
+        } else if (value != storeId) {
+          context.pushReplacement('/store-dashboard/$value/orders');
+        }
+      },
+      itemBuilder: (_) => [
+        ...stores.map(
+          (s) => PopupMenuItem<String>(
+            value: s.id,
+            height: 46,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.storefront_outlined,
+                  size: 16,
+                  color: s.id == storeId
+                      ? const Color(0xFFF4B400)
+                      : Colors.black45,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    s.name,
+                    style: TextStyle(
+                      fontWeight: s.id == storeId
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                      fontSize: 14,
+                      color: s.id == storeId
+                          ? const Color(0xFF1A1A1A)
+                          : const Color(0xFF374151),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (s.id == storeId) ...[
+                  const SizedBox(width: 8),
+                  const Icon(Icons.check_circle,
+                      size: 16, color: Color(0xFFF4B400)),
+                ],
+              ],
             ),
           ),
-          storesAsync.maybeWhen(
-            data: (s) => s.length > 1
-                ? const Icon(Icons.arrow_drop_down, size: 20)
-                : const SizedBox.shrink(),
-            orElse: () => const SizedBox.shrink(),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem<String>(
+          value: '__create__',
+          height: 46,
+          child: Row(
+            children: [
+              Icon(Icons.add_circle_outline,
+                  size: 16, color: Color(0xFF43A047)),
+              SizedBox(width: 10),
+              Text(
+                'Tạo cửa hàng mới',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF43A047),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-
-  void _showSwitcher(BuildContext context, List<_SimpleStore> stores) {
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('Chọn cửa hàng',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-          ),
-          ...stores.map(
-            (s) => ListTile(
-              title: Text(s.name),
-              trailing: s.id == storeId
-                  ? const Icon(Icons.check, color: Colors.green)
-                  : null,
-              onTap: () {
-                Navigator.pop(context);
-                if (s.id != storeId) {
-                  context.pushReplacement(
-                      '/store-dashboard/${s.id}/orders');
-                }
-              },
+        ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.storefront_outlined,
+                size: 15, color: Colors.black54),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(
+                storeName.isEmpty ? 'Cửa hàng' : storeName,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700, fontSize: 14),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-        ],
+            const SizedBox(width: 2),
+            if (isLoading)
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 1.5),
+              )
+            else
+              const Icon(Icons.arrow_drop_down,
+                  size: 20, color: Colors.black54),
+          ],
+        ),
       ),
     );
   }

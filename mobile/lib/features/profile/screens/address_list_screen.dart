@@ -6,11 +6,26 @@ import '../providers/profile_providers.dart';
 import '../models/address_model.dart';
 import 'add_address_screen.dart';
 
-class AddressListScreen extends ConsumerWidget {
+class AddressListScreen extends ConsumerStatefulWidget {
   const AddressListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AddressListScreen> createState() => _AddressListScreenState();
+}
+
+class _AddressListScreenState extends ConsumerState<AddressListScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Force fresh fetch for the current user every time this screen opens,
+    // preventing stale data from a previously logged-in user.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(addressNotifierProvider.notifier).load();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final addrAsync = ref.watch(addressNotifierProvider);
 
     return Scaffold(
@@ -36,14 +51,20 @@ class AddressListScreen extends ConsumerWidget {
                   address: addresses[i],
                   onSetDefault: () =>
                       ref.read(addressNotifierProvider.notifier).setDefault(addresses[i].id),
-                  onDelete: () => _confirmDelete(context, ref, addresses[i].id),
+                  onEdit: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AddAddressScreen(initialAddress: addresses[i]),
+                    ),
+                  ).then((_) => ref.read(addressNotifierProvider.notifier).load()),
+                  onDelete: () => _confirmDelete(context, addresses[i].id),
                 ),
               ),
       ),
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context, WidgetRef ref, String id) async {
+  Future<void> _confirmDelete(BuildContext context, String id) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -64,11 +85,13 @@ class AddressListScreen extends ConsumerWidget {
 class _AddressTile extends StatelessWidget {
   final AddressModel address;
   final VoidCallback onSetDefault;
+  final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   const _AddressTile({
     required this.address,
     required this.onSetDefault,
+    required this.onEdit,
     required this.onDelete,
   });
 
@@ -105,10 +128,12 @@ class _AddressTile extends StatelessWidget {
         itemBuilder: (_) => [
           if (!address.isDefault)
             const PopupMenuItem(value: 'default', child: Text('Đặt mặc định')),
+          const PopupMenuItem(value: 'edit', child: Text('Sửa')),
           const PopupMenuItem(value: 'delete', child: Text('Xoá')),
         ],
         onSelected: (v) {
           if (v == 'default') onSetDefault();
+          if (v == 'edit') onEdit();
           if (v == 'delete') onDelete();
         },
       ),
