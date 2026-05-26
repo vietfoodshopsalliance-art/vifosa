@@ -108,6 +108,7 @@ class ApiEndpoints {
   static String orderAccept(String id)            => '/orders/$id/accept';
   static String orderReject(String id)            => '/orders/$id/reject';
   static String orderDeliver(String id)           => '/orders/$id/deliver';
+  static String orderMarkDelivered(String id)     => '/orders/$id/mark-delivered';
   static String orderComplete(String id)          => '/orders/$id/complete';
   // legacy aliases kept for compatibility
   static String orderHandover(String id)          => '/orders/$id/deliver';

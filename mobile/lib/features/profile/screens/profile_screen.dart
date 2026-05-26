@@ -9,7 +9,7 @@ import '../models/address_model.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
-final _myRatingProvider = FutureProvider<_RatingSummary?>((ref) async {
+final _myRatingProvider = FutureProvider.autoDispose<_RatingSummary?>((ref) async {
   try {
     final res = await DioClient.instance.get('/me/reviews');
     final data = res.data as Map<String, dynamic>? ?? {};
@@ -606,7 +606,7 @@ class MyRatingScreen extends ConsumerWidget {
 }
 
 final _myRatingDetailProvider =
-    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
   final res = await DioClient.instance.get('/me/reviews');
   final list = res.data['reviews'] as List? ?? [];
   return list.cast<Map<String, dynamic>>();

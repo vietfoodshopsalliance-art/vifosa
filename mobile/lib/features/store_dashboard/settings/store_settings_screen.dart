@@ -70,7 +70,9 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
   // Location
   double? _lat;
   double? _lng;
-  final _mapsCtrl = TextEditingController();
+  final _mapsCoordCtrl = TextEditingController();
+  final _mapsShareCtrl = TextEditingController();
+  bool _geocoding = false;
 
   // Payment methods
   bool _pmBankTransfer = true;
@@ -106,7 +108,8 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
     _descCtrl.dispose();
     _addressCtrl.dispose();
     _phoneCtrl.dispose();
-    _mapsCtrl.dispose();
+    _mapsCoordCtrl.dispose();
+    _mapsShareCtrl.dispose();
     _bankNoCtrl.dispose();
     _bankNameCtrl.dispose();
     _autoCancelCtrl.dispose();
@@ -341,19 +344,115 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
     }
   }
 
-  void _parseMapsLink() {
-    final text = _mapsCtrl.text;
+  (double, double)? _extractCoords(String text) {
     final r1 = RegExp(r'@(-?\d+\.\d+),(-?\d+\.\d+)');
     final r2 = RegExp(r'!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)');
     final r3 = RegExp(r'[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)');
     final match = r1.firstMatch(text) ?? r2.firstMatch(text) ?? r3.firstMatch(text);
-    if (match != null) {
-      setState(() {
-        _lat = double.parse(match.group(1)!);
-        _lng = double.parse(match.group(2)!);
-      });
-    } else {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Không tìm thấy toạ độ trong link')));
+    if (match == null) return null;
+    return (double.parse(match.group(1)!), double.parse(match.group(2)!));
+  }
+
+  Future<(double, double)?> _followShareLink(String url) async {
+    try {
+      final client = Dio(BaseOptions(
+        followRedirects: true,
+        maxRedirects: 5,
+        receiveTimeout: const Duration(seconds: 10),
+        connectTimeout: const Duration(seconds: 10),
+        headers: {'User-Agent': 'Mozilla/5.0 (compatible; vifosa-app/1.0)'},
+      ));
+      final res = await client.get(url);
+      return _extractCoords(res.realUri.toString());
+    } on DioException catch (e) {
+      final location = e.response?.headers.value('location');
+      if (location != null) return _extractCoords(location);
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _getCoords() async {
+    setState(() => _geocoding = true);
+    try {
+      // 1. Ưu tiên địa chỉ text → Nominatim
+      final addr = _addressCtrl.text.trim();
+      if (addr.isNotEmpty) {
+        final client = Dio();
+        final res = await client.get(
+          'https://nominatim.openstreetmap.org/search',
+          queryParameters: {
+            'q': addr,
+            'format': 'json',
+            'limit': '1',
+            'countrycodes': 'vn',
+          },
+          options: Options(headers: {'User-Agent': 'vifosa-app/1.0 (contact@vifosa.vn)'}),
+        );
+        final list = res.data as List;
+        if (list.isNotEmpty) {
+          final item = list[0] as Map<String, dynamic>;
+          setState(() {
+            _lat = double.parse(item['lat'] as String);
+            _lng = double.parse(item['lon'] as String);
+          });
+          return;
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Không tìm thấy toạ độ cho địa chỉ này')));
+        }
+        return;
+      }
+
+      // 2. Link Google Maps có lat/lng → parse trực tiếp
+      final coordLink = _mapsCoordCtrl.text.trim();
+      if (coordLink.isNotEmpty) {
+        final coords = _extractCoords(coordLink);
+        if (coords != null) {
+          setState(() {
+            _lat = coords.$1;
+            _lng = coords.$2;
+          });
+          return;
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Không tìm thấy toạ độ trong link này')));
+        }
+        return;
+      }
+
+      // 3. Link Google Maps share → follow redirect
+      final shareLink = _mapsShareCtrl.text.trim();
+      if (shareLink.isNotEmpty) {
+        final coords = await _followShareLink(shareLink);
+        if (coords != null) {
+          setState(() {
+            _lat = coords.$1;
+            _lng = coords.$2;
+          });
+          return;
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Không tìm thấy toạ độ trong link share')));
+        }
+        return;
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Nhập địa chỉ hoặc paste link Google Maps')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Lỗi lấy tọa độ: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _geocoding = false);
     }
   }
 
@@ -434,40 +533,46 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
             TextFormField(
               controller: _addressCtrl,
               decoration: const InputDecoration(
-                  labelText: 'Địa chỉ', border: OutlineInputBorder()),
+                  labelText: 'Địa chỉ (tuỳ chọn)', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _mapsCoordCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Link Google Maps có toạ độ (tuỳ chọn)',
+                hintText: 'https://maps.google.com/...@10.77,106.70...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _mapsShareCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Link Google Maps share (tuỳ chọn)',
+                hintText: 'https://maps.app.goo.gl/...',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: _useGps,
-                    icon: const Icon(Icons.my_location, size: 18),
-                    label: const Text('Dùng GPS'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _mapsCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Paste link Google Maps (tuỳ chọn)',
-                      border: OutlineInputBorder(),
-                    ),
+                    onPressed: _geocoding ? null : _getCoords,
+                    icon: _geocoding
+                        ? const SizedBox.square(
+                            dimension: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.location_searching, size: 16),
+                    label: const Text('Lấy toạ độ'),
                   ),
                 ),
                 const SizedBox(width: 8),
-                SizedBox(
-                  height: 56,
-                  width: 64,
-                  child: OutlinedButton(
-                    onPressed: _parseMapsLink,
-                    child: const Text('Lấy'),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _useGps,
+                    icon: const Icon(Icons.my_location, size: 16),
+                    label: const Text('GPS hiện tại'),
                   ),
                 ),
               ],

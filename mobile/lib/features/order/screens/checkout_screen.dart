@@ -35,8 +35,8 @@ final _storePaymentMethodsProvider =
   final store = (raw['store'] ?? raw) as Map<String, dynamic>;
   final pm = store['paymentMethods'] as Map? ?? {};
   final supported = <String>[];
-  if (pm['cod'] == true) supported.add('cod');
   if (pm['bankTransfer'] == true) supported.add('bank_transfer');
+  if (pm['cod'] == true) supported.add('cod');
   if (pm['fiftyFifty'] == true) supported.add('fifty_fifty');
   return supported.isEmpty ? ['cod'] : supported;
 });
@@ -54,7 +54,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   final _addressCtrl       = TextEditingController();
   final _noteCtrl          = TextEditingController();
 
-  String _paymentMethod  = 'cod';
+  String _paymentMethod  = '';
   String _deliveryMethod = 'store_delivery';
   bool _loading = false;
   String? _errorMsg;
@@ -387,7 +387,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     // Auto-select phương thức đầu tiên khi load xong
     ref.listen(_storePaymentMethodsProvider(storeId), (_, next) {
       next.whenData((methods) {
-        if (!methods.contains(_paymentMethod)) {
+        if (_paymentMethod.isEmpty || !methods.contains(_paymentMethod)) {
           _onPaymentMethodChanged(methods.first);
         }
       });

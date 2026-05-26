@@ -651,7 +651,8 @@ class _TrackingTab extends StatelessWidget {
 
   static bool _canConfirmReceived(
       String status, String paymentMethod, String paymentStatus) {
-    if (status != 'preparing' && status != 'delivering') return false;
+    // Chỉ cho phép khi quán đã đánh dấu "đã giao" (delivered)
+    if (status != 'delivered') return false;
     switch (paymentMethod) {
       case 'cod':
         return true;
@@ -944,17 +945,43 @@ class _ReviewTabState extends ConsumerState<_ReviewTab> {
   int _rating = 5;
   final _commentCtrl = TextEditingController();
   bool _loading = false;
-  bool _submitted = false;
+  Map<String, dynamic>? _existingReview;
+  bool _checkingReview = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingReview();
+  }
+
+  Future<void> _loadExistingReview() async {
+    try {
+      final res = await DioClient.instance.get(ApiEndpoints.orderReviews(widget.orderId));
+      final data = res.data as Map<String, dynamic>;
+      if (mounted) {
+        setState(() {
+          _existingReview = data['storeReview'] as Map<String, dynamic>?;
+          _checkingReview = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _checkingReview = false);
+    }
+  }
 
   Future<void> _submitReview() async {
     setState(() => _loading = true);
     try {
-      await DioClient.instance.post(
+      final res = await DioClient.instance.post(
         ApiEndpoints.orderReview(widget.orderId),
         data: {'stars': _rating, 'comment': _commentCtrl.text.trim()},
       );
-      setState(() => _submitted = true);
-    } catch (_) {
+      if (mounted) setState(() => _existingReview = res.data as Map<String, dynamic>?);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 409) {
+        await _loadExistingReview();
+        return;
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Không thể gửi đánh giá')),
@@ -974,18 +1001,42 @@ class _ReviewTabState extends ConsumerState<_ReviewTab> {
   @override
   Widget build(BuildContext context) {
     final status = widget.order['mainStatus'] as String? ?? '';
-    final canReview = status == 'completed' || status == 'delivered';
+    final canReview = status == 'completed';
 
-    if (_submitted) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.check_circle, color: Color(0xFF4CAF50), size: 56),
-            SizedBox(height: 12),
-            Text('Cảm ơn bạn đã đánh giá!',
-                style: TextStyle(fontSize: 16)),
-          ],
+    if (_checkingReview) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_existingReview != null) {
+      final stars = (_existingReview!['stars'] as num?)?.toInt() ?? 0;
+      final comment = _existingReview!['comment'] as String? ?? '';
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.check_circle, color: Color(0xFF4CAF50), size: 56),
+              const SizedBox(height: 12),
+              const Text('Bạn đã đánh giá đơn hàng này',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (i) => Icon(
+                  i < stars ? Icons.star_rounded : Icons.star_outline_rounded,
+                  size: 28,
+                  color: i < stars ? Colors.amber : Colors.grey.shade300,
+                )),
+              ),
+              if (comment.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(comment,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14, color: Colors.black87)),
+              ],
+            ],
+          ),
         ),
       );
     }

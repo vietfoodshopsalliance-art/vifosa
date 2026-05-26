@@ -130,8 +130,8 @@ class _StoreOrderDetailScreenState
   }
 
   String get _deliverBtnLabel {
-    if (widget.order.paymentMethod == 'cod') return 'Đã giao cho khách';
-    return 'Giao hàng';
+    if (widget.order.mainStatus == 'delivering') return 'Đã giao';
+    return 'Bắt đầu giao';
   }
 
   String _deliveryMethodLabel(String m) {

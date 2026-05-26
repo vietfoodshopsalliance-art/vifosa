@@ -13,6 +13,7 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/network/socket_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../models/store_order.dart';
 import '../orders/widgets/order_card_store.dart';
 import '../orders/store_order_detail_screen.dart';
@@ -295,29 +296,19 @@ class StoreOrdersNotifier extends StateNotifier<StoreOrdersState> {
     await fetchOrders();
   }
 
-  Future<void> deliverOrder(String orderId) async {
-    final inProgress = state.inProgressOrders.where((o) => o.id == orderId);
-    final pending = state.pendingOrders.where((o) => o.id == orderId);
-    final order = inProgress.isNotEmpty
-        ? inProgress.first
-        : pending.isNotEmpty
-            ? pending.first
-            : null;
+  // preparing → delivering
+  Future<void> startDelivery(String orderId) async {
+    await DioClient.instance.patch(ApiEndpoints.orderDeliver(orderId), data: {});
+    await fetchOrders();
+  }
 
-    if (order == null) return;
+  // delivering → delivered (quán xác nhận "đã trao hàng"); ghi nhận COD nếu có
+  Future<void> markDelivered(String orderId) async {
+    final order = state.inProgressOrders.where((o) => o.id == orderId).firstOrNull;
+    await DioClient.instance.patch(ApiEndpoints.orderMarkDelivered(orderId), data: {});
 
-    // Chain đúng theo trạng thái hiện tại
-    if (order.isPending) {
-      await DioClient.instance.patch(ApiEndpoints.orderAccept(orderId), data: {});
-      await DioClient.instance.patch(ApiEndpoints.orderDeliver(orderId), data: {});
-    } else if (order.mainStatus == 'preparing') {
-      await DioClient.instance.patch(ApiEndpoints.orderDeliver(orderId), data: {});
-    }
-    // Hoàn thành đơn cho mọi phương thức thanh toán
-    await DioClient.instance.patch(ApiEndpoints.orderComplete(orderId), data: {});
-
-    // Thu tiền khi giao (COD và fifty_fifty)
-    if (order.remainingAmount > 0 &&
+    if (order != null &&
+        order.remainingAmount > 0 &&
         (order.paymentMethod == 'cod' || order.paymentMethod == 'fifty_fifty')) {
       await DioClient.instance.patch(
         ApiEndpoints.orderConfirmMoney(orderId),
@@ -328,6 +319,9 @@ class StoreOrdersNotifier extends StateNotifier<StoreOrdersState> {
     await fetchOrders();
     await _fetchHistory();
   }
+
+  // Kept for backward compat — alias gọi startDelivery (preparing → delivering)
+  Future<void> deliverOrder(String orderId) => startDelivery(orderId);
 
   Future<void> returnToPending(String orderId) async {
     await DioClient.instance
@@ -366,6 +360,8 @@ final storeOrdersProvider = StateNotifierProvider.family<StoreOrdersNotifier,
 
 final _myStoresListProvider =
     FutureProvider<List<_SimpleStore>>((ref) async {
+  // Re-fetch khi user thay đổi (fix: tránh cache quán của user cũ sau khi đổi account)
+  ref.watch(authProvider.select((s) => s.user?['_id']));
   final res = await DioClient.instance.get(ApiEndpoints.myStores);
   final raw = res.data;
   final list =
@@ -735,20 +731,24 @@ class _StoreSwitcher extends ConsumerWidget {
           ),
         ),
         const PopupMenuDivider(),
-        const PopupMenuItem<String>(
-          value: '__create__',
+        PopupMenuItem<String>(
+          value: stores.length < 8 ? '__create__' : null,
+          enabled: stores.length < 8,
           height: 46,
           child: Row(
             children: [
-              Icon(Icons.add_circle_outline,
-                  size: 16, color: Color(0xFF43A047)),
-              SizedBox(width: 10),
+              Icon(
+                stores.length < 8 ? Icons.add_circle_outline : Icons.block,
+                size: 16,
+                color: stores.length < 8 ? const Color(0xFF43A047) : Colors.grey,
+              ),
+              const SizedBox(width: 10),
               Text(
-                'Tạo cửa hàng mới',
+                stores.length < 8 ? 'Tạo cửa hàng mới' : 'Đã đạt giới hạn 8 cửa hàng',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF43A047),
+                  color: stores.length < 8 ? const Color(0xFF43A047) : Colors.grey,
                 ),
               ),
             ],
@@ -896,16 +896,6 @@ class _PendingTabState extends ConsumerState<_PendingTab> {
         builder: (_, ctrl) => StoreOrderDetailScreen(
           order: order,
           storeId: widget.storeId,
-          onDeliver: () async {
-            try {
-              await notifier.deliverOrder(order.id);
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
-              }
-            }
-          },
           onRecordPayment: order.paymentMethod != 'cod'
               ? (amount) async {
                   try {
@@ -1007,6 +997,32 @@ class _InProgressTab extends ConsumerWidget {
         itemCount: orders.length,
         itemBuilder: (context, i) {
           final order = orders[i];
+          VoidCallback? deliverCb;
+          if (order.mainStatus == 'preparing') {
+            deliverCb = () async {
+              try {
+                await notifier.startDelivery(order.id);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                }
+              }
+            };
+          } else if (order.mainStatus == 'delivering') {
+            deliverCb = () async {
+              try {
+                await notifier.markDelivered(order.id);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                }
+              }
+            };
+          }
+          // delivered: không có nút action (chờ khách xác nhận)
+
           return OrderCardStore(
             key: ValueKey(order.id),
             order: order,
@@ -1015,26 +1031,19 @@ class _InProgressTab extends ConsumerWidget {
             autoConfirmMinutes: state.autoConfirmMinutes,
             deliveryTimeoutMinutes: state.deliveryTimeoutMinutes,
             onTap: () => _openDetail(context, ref, order, notifier),
-            onDeliver: () async {
-              try {
-                await notifier.deliverOrder(order.id);
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
-                }
-              }
-            },
-            onReturnToPending: () async {
-              try {
-                await notifier.returnToPending(order.id);
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
-                }
-              }
-            },
+            onDeliver: deliverCb,
+            onReturnToPending: order.mainStatus != 'delivered'
+                ? () async {
+                    try {
+                      await notifier.returnToPending(order.id);
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context)
+                            .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                      }
+                    }
+                  }
+                : null,
             onRecordPayment: order.paymentMethod != 'cod'
                 ? (amount) async {
                     try {
@@ -1055,6 +1064,32 @@ class _InProgressTab extends ConsumerWidget {
 
   void _openDetail(BuildContext context, WidgetRef ref, StoreOrder order,
       StoreOrdersNotifier notifier) {
+    VoidCallback? deliverCb;
+    if (order.mainStatus == 'preparing') {
+      deliverCb = () async {
+        try {
+          await notifier.startDelivery(order.id);
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context)
+                .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+          }
+        }
+      };
+    } else if (order.mainStatus == 'delivering') {
+      deliverCb = () async {
+        try {
+          await notifier.markDelivered(order.id);
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context)
+                .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+          }
+        }
+      };
+    }
+    // delivered: không có nút action
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1067,26 +1102,19 @@ class _InProgressTab extends ConsumerWidget {
         builder: (_, __) => StoreOrderDetailScreen(
           order: order,
           storeId: storeId,
-          onDeliver: () async {
-            try {
-              await notifier.deliverOrder(order.id);
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
-              }
-            }
-          },
-          onReturnToPending: () async {
-            try {
-              await notifier.returnToPending(order.id);
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
-              }
-            }
-          },
+          onDeliver: deliverCb,
+          onReturnToPending: order.mainStatus != 'delivered'
+              ? () async {
+                  try {
+                    await notifier.returnToPending(order.id);
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context)
+                          .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                    }
+                  }
+                }
+              : null,
           onRecordPayment: order.paymentMethod != 'cod'
               ? (amount) async {
                   try {

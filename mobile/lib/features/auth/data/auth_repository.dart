@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/storage/secure_storage.dart';
@@ -45,6 +46,8 @@ class AuthRepository {
       await _dio.post(ApiEndpoints.logout);
     } catch (_) {}
     await SecureStorage.clearTokens(); // giữ remember-me credentials
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('last_store_id'); // xóa cache quán để không leak sang user khác
   }
 
   Future<Map<String, dynamic>> getMe() async {

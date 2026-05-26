@@ -189,8 +189,8 @@ class _OrderCardStoreState extends State<OrderCardStore> {
   }
 
   String get _deliverBtnLabel {
-    if (widget.order.paymentMethod == 'cod') return 'Đã giao cho khách';
-    return 'Giao hàng';
+    if (widget.order.mainStatus == 'delivering') return 'Đã giao';
+    return 'Bắt đầu giao';
   }
 
   // ─── Auto-action hint ─────────────────────────────────────────────────────
@@ -580,7 +580,34 @@ class _OrderCardStoreState extends State<OrderCardStore> {
       );
     }
 
-    // Active tab
+    // Active tab — delivered: chờ khách xác nhận, không có nút action
+    if (widget.order.mainStatus == 'delivered') {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.green.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.green.shade200),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.hourglass_top_rounded,
+                size: 16, color: Colors.green.shade700),
+            const SizedBox(width: 6),
+            Text(
+              'Chờ khách xác nhận nhận hàng',
+              style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.green.shade700,
+                  fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Row(
       children: [
         OutlinedButton.icon(
