@@ -1,6 +1,7 @@
 // lib/features/store_dashboard/orders/store_order_detail_screen.dart
 
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -82,15 +83,25 @@ class _StoreOrderDetailScreenState
     required List<String> images,
     required bool isAnonymous,
   }) async {
-    await DioClient.instance.post(
-      ApiEndpoints.orderCustomerReview(widget.order.id),
-      data: {
-        'stars': stars,
-        'comment': comment,
-        'images': images,
-        'isAnonymous': isAnonymous,
-      },
-    );
+    try {
+      await DioClient.instance.post(
+        ApiEndpoints.orderCustomerReview(widget.order.id),
+        data: {
+          'stars': stars,
+          'comment': comment,
+          'images': images,
+          'isAnonymous': isAnonymous,
+        },
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 409) {
+        // Review đã tồn tại — refresh để hiển thị đúng rồi thoát bình thường
+        await _fetchOrderReviews();
+        return;
+      }
+      final msg = (e.response?.data as Map?)?['error'] as String?;
+      throw Exception(msg ?? 'Gửi đánh giá thất bại');
+    }
     await _fetchOrderReviews();
   }
 
