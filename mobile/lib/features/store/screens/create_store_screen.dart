@@ -164,32 +164,46 @@ class _CreateStoreScreenState extends ConsumerState<CreateStoreScreen> {
       // 1. Ưu tiên địa chỉ text → Nominatim
       final addr = _addrCtrl.text.trim();
       if (addr.isNotEmpty) {
-        final client = dio_pkg.Dio();
-        final res = await client.get(
-          'https://nominatim.openstreetmap.org/search',
-          queryParameters: {
-            'q': addr,
-            'format': 'json',
-            'limit': '1',
-            'countrycodes': 'vn',
-          },
-          options: dio_pkg.Options(
-              headers: {'User-Agent': 'vifosa-app/1.0 (contact@vifosa.vn)'}),
-        );
-        final list = res.data as List;
-        if (list.isNotEmpty) {
-          final item = list[0] as Map<String, dynamic>;
-          setState(() {
-            _lat = double.parse(item['lat'] as String);
-            _lng = double.parse(item['lon'] as String);
-          });
+        try {
+          final client = dio_pkg.Dio();
+          final res = await client.get(
+            'https://nominatim.openstreetmap.org/search',
+            queryParameters: {
+              'q': addr,
+              'format': 'json',
+              'limit': '1',
+              'countrycodes': 'vn',
+            },
+            options: dio_pkg.Options(
+                headers: {'User-Agent': 'vifosa-app/1.0 (contact@vifosa.vn)'}),
+          );
+          final list = res.data as List;
+          if (list.isNotEmpty) {
+            final item = list[0] as Map<String, dynamic>;
+            setState(() {
+              _lat = double.parse(item['lat'] as String);
+              _lng = double.parse(item['lon'] as String);
+            });
+            return;
+          }
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Không tìm thấy toạ độ cho địa chỉ này')));
+          }
+          return;
+        } on dio_pkg.DioException catch (e) {
+          final status = e.response?.statusCode;
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(
+                status == 503
+                    ? 'Dịch vụ tìm địa chỉ đang quá tải, thử lại sau hoặc dán link Google Maps bên dưới.'
+                    : 'Không tìm được toạ độ từ địa chỉ (lỗi $status). Hãy dán link Google Maps.',
+              ),
+            ));
+          }
           return;
         }
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('Không tìm thấy toạ độ cho địa chỉ này')));
-        }
-        return;
       }
 
       // 2. Link Google Maps có lat/lng → parse trực tiếp

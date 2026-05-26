@@ -5,9 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../features/auth/providers/auth_provider.dart';
-import '../models/store_card.dart';
 import '../providers/home_feed_provider.dart';
-import '../widgets/store_card_widget.dart';
+import '../widgets/food_item_card_widget.dart';
+
+// Provider để scaffold_with_nav trigger scroll-to-top
+final homeScrollToTopProvider = StateProvider<int>((ref) => 0);
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -31,27 +33,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
-  void _onScroll() {
-    final pos = _scrollCtrl.position;
-    if (pos.pixels >= pos.maxScrollExtent - 300) {
-      ref.read(nearbyStoresProvider.notifier).loadMore();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
-    final isAuth    = authState.isAuthenticated;
-    final user      = authState.user;
+    final isAuth = authState.isAuthenticated;
+    final user = authState.user;
+
+    // Scroll to top khi dropdown "Trang chủ" được nhấn
+    ref.listen(homeScrollToTopProvider, (_, __) {
+      if (_scrollCtrl.hasClients) {
+        _scrollCtrl.animateTo(
+          0,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F7F7),
+      backgroundColor: const Color(0xFFF7F2E8),
       body: RefreshIndicator(
         color: const Color(0xFFF4B400),
         onRefresh: _onRefresh,
         child: CustomScrollView(
           controller: _scrollCtrl,
           slivers: [
-            // ── AppBar ────────────────────────────────────────────────
+            // ── AppBar ──────────────────────────────────────────────────────
             SliverAppBar(
               floating: true,
               snap: true,
@@ -71,7 +78,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: GestureDetector(
-                      onTap: () => context.go('/search'),
+                      onTap: () => context.push('/search'),
                       behavior: HitTestBehavior.opaque,
                       child: Container(
                         height: 38,
@@ -80,8 +87,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Row(
-                          children: const [
+                        child: const Row(
+                          children: [
                             Icon(Icons.search_rounded,
                                 color: Colors.black38, size: 18),
                             SizedBox(width: 6),
@@ -126,38 +133,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ],
             ),
 
-            // ── Section 1: Quán mới ───────────────────────────────────
-            _SectionSliver(
-              title: 'Quán mới',
-              icon: Icons.storefront_rounded,
-              provider: newStoresProvider,
-            ),
-
-            // ── Section 2: Bán chạy ───────────────────────────────────
-            _SectionSliver(
-              title: 'Bán chạy',
-              icon: Icons.local_fire_department_rounded,
-              provider: popularStoresProvider,
-            ),
-
-            // ── Section 3: Đã mua gần đây (logged-in) ────────────────
-            if (isAuth)
-              _SectionSliver(
-                title: 'Đã mua gần đây',
-                icon: Icons.history_rounded,
-                provider: recentPurchaseStoresProvider,
-              ),
-
-            // ── Section 4: Yêu thích (logged-in) ─────────────────────
-            if (isAuth)
-              _SectionSliver(
-                title: 'Yêu thích',
-                icon: Icons.favorite_border_rounded,
-                provider: favoriteStoresProvider,
-              ),
-
-            // ── Section 5: Quán gần bạn (infinite scroll) ────────────
-            _NearbySection(),
+            // ── Grid món ăn gần bạn ─────────────────────────────────────────
+            _FoodItemsSection(scrollCtrl: _scrollCtrl),
 
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
           ],
@@ -169,87 +146,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _onRefresh() async {
     await ref.read(nearbyStoresProvider.notifier).refresh();
   }
-}
 
-// ── Generic horizontal section ────────────────────────────────────────────────
-
-class _SectionSliver extends ConsumerWidget {
-  final String title;
-  final IconData icon;
-  final ProviderListenable<AsyncValue<List<StoreCard>>> provider;
-
-  const _SectionSliver({
-    required this.title,
-    required this.icon,
-    required this.provider,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(provider);
-
-    return async.when(
-      loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
-      error: (_, __) => const SliverToBoxAdapter(child: SizedBox.shrink()),
-      data: (stores) {
-        if (stores.isEmpty) {
-          return const SliverToBoxAdapter(child: SizedBox.shrink());
-        }
-        return SliverToBoxAdapter(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 3,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF4B400),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(icon, size: 18, color: const Color(0xFFF4B400)),
-                    const SizedBox(width: 6),
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF1A1A1A),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 158,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.only(left: 16, right: 4, bottom: 2),
-                  itemCount: stores.length,
-                  itemBuilder: (_, i) => StoreCardHorizontal(
-                    store: stores[i],
-                    onTap: () => context.push('/store/${stores[i].id}'),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+  void _onScroll() {
+    final pos = _scrollCtrl.position;
+    if (pos.pixels >= pos.maxScrollExtent - 400) {
+      ref.read(nearbyStoresProvider.notifier).loadMore();
+    }
   }
 }
 
-// ── Section: Nearby stores (infinite scroll) ─────────────────────────────────
+// ── Grid section món ăn ───────────────────────────────────────────────────────
 
-class _NearbySection extends ConsumerWidget {
+class _FoodItemsSection extends ConsumerWidget {
+  final ScrollController scrollCtrl;
+  const _FoodItemsSection({required this.scrollCtrl});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(nearbyStoresProvider);
@@ -262,7 +173,7 @@ class _NearbySection extends ConsumerWidget {
       );
     }
 
-    if (state.error != null && state.stores.isEmpty) {
+    if (state.error != null && state.items.isEmpty) {
       return SliverFillRemaining(
         child: Center(
           child: Column(
@@ -291,16 +202,16 @@ class _NearbySection extends ConsumerWidget {
       );
     }
 
-    if (state.stores.isEmpty) {
+    if (state.items.isEmpty) {
       return const SliverFillRemaining(
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.store_mall_directory_outlined,
+              Icon(Icons.restaurant_menu_outlined,
                   size: 64, color: Colors.black26),
               SizedBox(height: 12),
-              Text('Chưa có quán nào trong khu vực của bạn.',
+              Text('Chưa có món ăn nào trong khu vực.',
                   style: TextStyle(color: Colors.black45),
                   textAlign: TextAlign.center),
             ],
@@ -311,9 +222,10 @@ class _NearbySection extends ConsumerWidget {
 
     return SliverMainAxisGroup(
       slivers: [
+        // Header
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
             child: Row(
               children: [
                 Container(
@@ -329,7 +241,7 @@ class _NearbySection extends ConsumerWidget {
                     size: 18, color: Color(0xFFF4B400)),
                 const SizedBox(width: 6),
                 const Text(
-                  'Quán gần bạn',
+                  'Món ăn gần bạn',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
@@ -340,15 +252,31 @@ class _NearbySection extends ConsumerWidget {
             ),
           ),
         ),
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (_, i) => StoreCardVertical(
-              store: state.stores[i],
-              onTap: () => context.push('/store/${state.stores[i].id}'),
+
+        // Grid 2 cột
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 0.72,
             ),
-            childCount: state.stores.length,
+            delegate: SliverChildBuilderDelegate(
+              (_, i) {
+                final item = state.items[i];
+                return FoodItemCardWidget(
+                  item: item,
+                  onTap: () => context.push('/store/${item.storeId}'),
+                );
+              },
+              childCount: state.items.length,
+            ),
           ),
         ),
+
+        // Loading more indicator
         if (state.isLoadingMore)
           const SliverToBoxAdapter(
             child: Padding(

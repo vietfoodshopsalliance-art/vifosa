@@ -1,5 +1,7 @@
 // lib/features/home/models/store_card.dart
 
+import 'food_item_card.dart';
+
 class StoreCard {
   final String id;
   final String name;
@@ -58,6 +60,7 @@ class HomeFeedData {
   final List<StoreCard> recentPurchases;
   final List<StoreCard> favorites;
   final List<StoreCard> nearbyStores;
+  final List<FoodItemCard> nearbyItems;
   final int? nextCursor;
   final bool hasMore;
 
@@ -67,6 +70,7 @@ class HomeFeedData {
     this.recentPurchases = const [],
     this.favorites = const [],
     this.nearbyStores = const [],
+    this.nearbyItems = const [],
     this.nextCursor,
     this.hasMore = false,
   });
@@ -77,23 +81,8 @@ class HomeFeedData {
         recentPurchases: _parseList(j['recentPurchases']),
         favorites: _parseList(j['favorites']),
         nearbyStores: _parseList(j['nearbyStores']),
+        nearbyItems: parseFoodItems(j['nearbyItems']),
         nextCursor: j['nextCursor'] as int?,
         hasMore: j['hasMore'] as bool? ?? false,
-      );
-
-  HomeFeedData appendNearby(
-    List<StoreCard> more,
-    int? cursor,
-    // ignore: non_constant_identifier_names
-    bool hasMore_,
-  ) =>
-      HomeFeedData(
-        newStores: newStores,
-        trendingStores: trendingStores,
-        recentPurchases: recentPurchases,
-        favorites: favorites,
-        nearbyStores: [...nearbyStores, ...more],
-        nextCursor: cursor,
-        hasMore: hasMore_,
       );
 }

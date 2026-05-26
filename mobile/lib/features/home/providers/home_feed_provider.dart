@@ -4,11 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../../core/providers/location_provider.dart';
+import '../models/food_item_card.dart';
 import '../models/store_card.dart';
 import '../../auth/providers/auth_provider.dart';
 
-// Radius cố định 25km — đủ bao phủ nội thành TP.HCM.
-// Tăng lên khi DB có nhiều store hơn và cần thu hẹp vùng.
 const _defaultRadius = 25;
 
 // ── Single /home-feed call ────────────────────────────────────────────────────
@@ -27,7 +26,7 @@ final homeFeedDataProvider =
   return HomeFeedData.fromJson(res.data as Map<String, dynamic>);
 });
 
-// ── Section providers derived from the single feed ────────────────────────────
+// ── Section providers ─────────────────────────────────────────────────────────
 
 final newStoresProvider =
     Provider<AsyncValue<List<StoreCard>>>((ref) =>
@@ -45,10 +44,11 @@ final favoriteStoresProvider =
     Provider<AsyncValue<List<StoreCard>>>((ref) =>
         ref.watch(homeFeedDataProvider(_defaultRadius)).whenData((d) => d.favorites));
 
-// ── Nearby section: infinite scroll (load-more via cursor) ───────────────────
+// ── Nearby: stores + items (infinite scroll via cursor) ───────────────────────
 
 class NearbyState {
   final List<StoreCard> stores;
+  final List<FoodItemCard> items;
   final bool isLoading;
   final bool isLoadingMore;
   final bool hasMore;
@@ -57,6 +57,7 @@ class NearbyState {
 
   const NearbyState({
     this.stores = const [],
+    this.items = const [],
     this.isLoading = true,
     this.isLoadingMore = false,
     this.hasMore = false,
@@ -66,6 +67,7 @@ class NearbyState {
 
   NearbyState copyWith({
     List<StoreCard>? stores,
+    List<FoodItemCard>? items,
     bool? isLoading,
     bool? isLoadingMore,
     bool? hasMore,
@@ -74,6 +76,7 @@ class NearbyState {
   }) =>
       NearbyState(
         stores: stores ?? this.stores,
+        items: items ?? this.items,
         isLoading: isLoading ?? this.isLoading,
         isLoadingMore: isLoadingMore ?? this.isLoadingMore,
         hasMore: hasMore ?? this.hasMore,
@@ -101,6 +104,7 @@ class NearbyNotifier extends StateNotifier<NearbyState> {
       final data = await _ref.read(homeFeedDataProvider(_defaultRadius).future);
       state = NearbyState(
         stores: data.nearbyStores,
+        items: data.nearbyItems,
         isLoading: false,
         hasMore: data.hasMore,
         nextCursor: data.nextCursor,
@@ -135,8 +139,10 @@ class NearbyNotifier extends StateNotifier<NearbyState> {
       final moreStores = (d['nearbyStores'] as List<dynamic>? ?? [])
           .map((e) => StoreCard.fromJson(e as Map<String, dynamic>))
           .toList();
+      final moreItems = parseFoodItems(d['nearbyItems']);
       state = NearbyState(
         stores: [...state.stores, ...moreStores],
+        items: [...state.items, ...moreItems],
         isLoading: false,
         hasMore: d['hasMore'] as bool? ?? false,
         nextCursor: d['nextCursor'] as int?,

@@ -10,6 +10,7 @@ import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/home/screens/home_screen.dart';
 import '../../features/search/screens/search_screen.dart';
+import '../../features/stores/screens/stores_screen.dart';
 import '../../features/cart/screens/cart_screen.dart';
 import '../../features/order/screens/orders_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
@@ -64,23 +65,34 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const RegisterScreen(),
       ),
 
+      // ── Search (push route, không thuộc shell) ────────────────────────────
+      GoRoute(
+        path: '/search',
+        builder: (_, __) => const SearchScreen(),
+      ),
+
       // ── Shell: màn hình có Bottom Navigation Bar ──────────────────────────
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             ScaffoldWithNav(navigationShell: navigationShell),
         branches: [
+          // 0 - Trang chủ
           StatefulShellBranch(routes: [
             GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
           ]),
+          // 1 - Quán
           StatefulShellBranch(routes: [
-            GoRoute(path: '/search', builder: (_, __) => const SearchScreen()),
+            GoRoute(path: '/stores', builder: (_, __) => const StoresScreen()),
           ]),
+          // 2 - Giỏ hàng
           StatefulShellBranch(routes: [
             GoRoute(path: '/cart', builder: (_, __) => const CartScreen()),
           ]),
+          // 3 - Đơn hàng
           StatefulShellBranch(routes: [
             GoRoute(path: '/orders', builder: (_, __) => const OrdersScreen()),
           ]),
+          // 4 - Cá nhân
           StatefulShellBranch(routes: [
             GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
           ]),
@@ -165,7 +177,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         ),
       ),
 
-      // ── Guest (không cần đăng nhập) ───────────────────────────────────────
+      // ── Guest ─────────────────────────────────────────────────────────────
       GoRoute(
         path: '/track',
         builder: (_, state) => GuestTrackingScreen(
@@ -247,7 +259,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         ),
       ),
 
-      // ── Admin (placeholder) ───────────────────────────────────────────────
+      // ── Admin ─────────────────────────────────────────────────────────────
       GoRoute(
         path: '/admin',
         builder: (_, __) => const _PlaceholderScreen(title: 'Admin Dashboard'),
@@ -269,12 +281,10 @@ class _RouterNotifier extends ChangeNotifier {
 
     final loc = state.matchedLocation;
 
-    // Đã đăng nhập → không cần ở trang login/register
     if (auth.isAuthenticated && (loc == '/login' || loc == '/register')) {
       return '/home';
     }
 
-    // Các route yêu cầu đăng nhập
     const protectedPrefixes = [
       '/orders',
       '/profile',
