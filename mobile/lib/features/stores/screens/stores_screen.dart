@@ -5,9 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/providers/liked_stores_provider.dart';
 import '../../../core/services/image_service.dart';
+import '../../../core/widgets/avatar_menu_button.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../home/models/store_card.dart';
 import '../../home/providers/home_feed_provider.dart';
+
+const _kRadius = 25;
 
 class StoresScreen extends ConsumerStatefulWidget {
   const StoresScreen({super.key});
@@ -38,45 +43,119 @@ class _StoresScreenState extends ConsumerState<StoresScreen> {
     }
   }
 
+  Future<void> _onRefresh() async {
+    await ref.read(nearbyStoresProvider.notifier).refresh();
+    ref.read(likedStoresProvider.notifier).reload();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(nearbyStoresProvider);
+    final authState = ref.watch(authProvider);
+    final isAuth = authState.isAuthenticated;
+    final user = authState.user;
+    final nearbyState = ref.watch(nearbyStoresProvider);
+    final feedAsync = ref.watch(homeFeedDataProvider(_kRadius));
+
+    // Xây danh sách theo thứ tự ưu tiên
+    final newStores = feedAsync.valueOrNull?.newStores ?? [];
+    final topNew = newStores.take(2).toList();
+    final newIds = topNew.map((s) => s.id).toSet();
+    final nearbyFiltered = nearbyState.stores
+        .where((s) => !newIds.contains(s.id))
+        .toList();
+    final allStores = [...topNew, ...nearbyFiltered];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F2E8),
       body: RefreshIndicator(
         color: const Color(0xFFF4B400),
-        onRefresh: () => ref.read(nearbyStoresProvider.notifier).refresh(),
+        onRefresh: _onRefresh,
         child: CustomScrollView(
           controller: _scrollCtrl,
           slivers: [
             // ── AppBar ───────────────────────────────────────────────────────
-            const SliverAppBar(
+            SliverAppBar(
               floating: true,
               snap: true,
               backgroundColor: Colors.white,
               elevation: 0,
               surfaceTintColor: Colors.transparent,
+              shadowColor: Colors.black12,
               forceElevated: true,
-              titleSpacing: 16,
-              title: Text(
-                'Quán gần bạn',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF1A1A1A),
-                ),
+              titleSpacing: 14,
+              title: Row(
+                children: [
+                  Image.asset(
+                    'assets/images/vietshop_logo_ngang.png',
+                    height: 14,
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => context.push('/search'),
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3F3F3),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.search_rounded,
+                                color: Colors.black38, size: 18),
+                            SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                'Tìm quán, món ăn...',
+                                style: TextStyle(
+                                    color: Colors.black38, fontSize: 13),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
+              actions: [
+                if (isAuth)
+                  IconButton(
+                    icon: const Icon(Icons.notifications_outlined,
+                        color: Colors.black87),
+                    tooltip: 'Thông báo',
+                    onPressed: () => context.push('/notifications'),
+                  ),
+                if (isAuth) AvatarMenuButton(user: user),
+                if (!isAuth)
+                  TextButton(
+                    onPressed: () => context.push('/login'),
+                    child: const Text(
+                      'Đăng nhập',
+                      style: TextStyle(
+                        color: Color(0xFFF4B400),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 4),
+              ],
             ),
 
             // ── Content ──────────────────────────────────────────────────────
-            if (state.isLoading)
+            if (nearbyState.isLoading)
               const SliverFillRemaining(
                 child: Center(
                   child: CircularProgressIndicator(color: Color(0xFFF4B400)),
                 ),
               )
-            else if (state.error != null && state.stores.isEmpty)
+            else if (nearbyState.error != null && allStores.isEmpty)
               SliverFillRemaining(
                 child: Center(
                   child: Column(
@@ -95,15 +174,14 @@ class _StoresScreenState extends ConsumerState<StoresScreen> {
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10)),
                         ),
-                        onPressed: () =>
-                            ref.read(nearbyStoresProvider.notifier).refresh(),
+                        onPressed: _onRefresh,
                         child: const Text('Thử lại'),
                       ),
                     ],
                   ),
                 ),
               )
-            else if (state.stores.isEmpty)
+            else if (allStores.isEmpty)
               const SliverFillRemaining(
                 child: Center(
                   child: Column(
@@ -124,7 +202,6 @@ class _StoresScreenState extends ConsumerState<StoresScreen> {
                 slivers: [
                   const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-                  // Grid 2 cột
                   SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     sliver: SliverGrid(
@@ -133,22 +210,22 @@ class _StoresScreenState extends ConsumerState<StoresScreen> {
                         crossAxisCount: 2,
                         crossAxisSpacing: 12,
                         mainAxisSpacing: 12,
-                        childAspectRatio: 0.78,
+                        childAspectRatio: 0.76,
                       ),
                       delegate: SliverChildBuilderDelegate(
                         (_, i) {
-                          final store = state.stores[i];
+                          final store = allStores[i];
                           return StoreGridCard(
                             store: store,
                             onTap: () => context.push('/store/${store.id}'),
                           );
                         },
-                        childCount: state.stores.length,
+                        childCount: allStores.length,
                       ),
                     ),
                   ),
 
-                  if (state.isLoadingMore)
+                  if (nearbyState.isLoadingMore)
                     const SliverToBoxAdapter(
                       child: Padding(
                         padding: EdgeInsets.all(20),
@@ -177,14 +254,18 @@ class _StoresScreenState extends ConsumerState<StoresScreen> {
 
 // ── Card quán 2-cột ───────────────────────────────────────────────────────────
 
-class StoreGridCard extends StatelessWidget {
+class StoreGridCard extends ConsumerWidget {
   final StoreCard store;
   final VoidCallback? onTap;
 
   const StoreGridCard({super.key, required this.store, this.onTap});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isAuth = ref.watch(authProvider.select((s) => s.isAuthenticated));
+    final likedMap = ref.watch(likedStoresProvider);
+    final likeId = likedMap[store.id];
+    final isLiked = likeId != null && likeId != '__pending__';
     final feature = _parseFeature(store.description);
 
     return GestureDetector(
@@ -204,7 +285,7 @@ class StoreGridCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Hình quán với floating 3D
+            // Hình quán
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
@@ -237,19 +318,32 @@ class StoreGridCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    // Badge đặc trưng nếu có
-                    if (feature != null)
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        child: _Badge(text: feature),
-                      ),
-                    // Trạng thái mở/đóng
+
+                    // Trạng thái mở/đóng — góc trên bên TRÁI
                     Positioned(
-                      top: 8,
-                      right: 8,
+                      top: 6,
+                      left: 6,
                       child: _OpenBadge(open: store.effectivelyOpen),
                     ),
+
+                    // Nút like — góc trên bên PHẢI
+                    if (isAuth)
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: _LikeButton(
+                          storeId: store.id,
+                          isLiked: isLiked,
+                        ),
+                      ),
+
+                    // Badge đặc trưng — góc dưới bên trái
+                    if (feature != null)
+                      Positioned(
+                        bottom: 6,
+                        left: 6,
+                        child: _Badge(text: feature),
+                      ),
                   ],
                 ),
               ),
@@ -296,6 +390,37 @@ class StoreGridCard extends StatelessWidget {
   }
 }
 
+// ── Like button ────────────────────────────────────────────────────────────────
+
+class _LikeButton extends ConsumerWidget {
+  final String storeId;
+  final bool isLiked;
+  const _LikeButton({required this.storeId, required this.isLiked});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => ref.read(likedStoresProvider.notifier).toggle(storeId),
+      child: Container(
+        padding: const EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.28),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+          color: isLiked ? const Color(0xFFEF4444) : Colors.white,
+          size: 15,
+          shadows: const [Shadow(color: Colors.black38, blurRadius: 4)],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Stats line ─────────────────────────────────────────────────────────────────
+
 class _StoreStats extends StatelessWidget {
   final StoreCard store;
   const _StoreStats({required this.store});
@@ -303,15 +428,21 @@ class _StoreStats extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final parts = <String>[];
+
     if (store.avgRating > 0) {
-      parts.add('★ ${store.avgRating.toStringAsFixed(1)}');
-    }
-    if (store.totalReviews > 0) {
-      parts.add('${_fmtNum(store.totalReviews)} đg');
+      final rating = _fmtRating(store.avgRating);
+      final reviews =
+          store.totalReviews > 0 ? ' (${_fmtNum(store.totalReviews)})' : '';
+      parts.add('★ $rating$reviews');
     }
     if (store.distanceKm != null) {
-      parts.add('${store.distanceKm!.toStringAsFixed(1)}km');
+      parts.add(_fmtDistance(store.distanceKm!));
     }
+    if (store.totalSold > 0) {
+      parts.add('${_fmtSold(store.totalSold)} đã bán');
+    }
+
+    if (parts.isEmpty) return const SizedBox.shrink();
 
     return Text(
       parts.join(' · '),
@@ -319,6 +450,17 @@ class _StoreStats extends StatelessWidget {
       overflow: TextOverflow.ellipsis,
       style: const TextStyle(fontSize: 10, color: Colors.black54),
     );
+  }
+
+  String _fmtRating(double r) {
+    final s = r.toStringAsFixed(1);
+    return s.endsWith('.0') ? s.substring(0, s.length - 2) : s;
+  }
+
+  String _fmtDistance(double km) {
+    if (km < 1.0) return '${(km * 1000).round()}m';
+    final s = km.toStringAsFixed(1);
+    return s.endsWith('.0') ? '${s.substring(0, s.length - 2)}km' : '${s}km';
   }
 
   String _fmtNum(int n) {
@@ -330,7 +472,19 @@ class _StoreStats extends StatelessWidget {
     }
     return '$n';
   }
+
+  String _fmtSold(int n) {
+    if (n >= 1000) {
+      final k = n / 1000;
+      return k == k.truncateToDouble()
+          ? '${k.toInt()}k+'
+          : '${k.toStringAsFixed(1)}k+';
+    }
+    return '$n+';
+  }
 }
+
+// ── Badge đặc trưng ────────────────────────────────────────────────────────────
 
 class _Badge extends StatelessWidget {
   final String text;
@@ -362,28 +516,48 @@ class _Badge extends StatelessWidget {
   }
 }
 
+// ── Badge mở/đóng ─────────────────────────────────────────────────────────────
+
 class _OpenBadge extends StatelessWidget {
   final bool open;
   const _OpenBadge({required this.open});
 
   @override
   Widget build(BuildContext context) {
+    final color = open
+        ? const Color(0xFF22C55E).withValues(alpha: 0.92)
+        : Colors.grey.withValues(alpha: 0.75);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(6),
-        color: open
-            ? const Color(0xFFF4B400).withValues(alpha: 0.9)
-            : Colors.black.withValues(alpha: 0.55),
+        color: color,
       ),
-      child: Text(
-        open ? 'Mở' : 'Đóng',
-        style: const TextStyle(
-            fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 5,
+            height: 5,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 3),
+          Text(
+            open ? 'Mở' : 'Đóng',
+            style: const TextStyle(
+                fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+          ),
+        ],
       ),
     );
   }
 }
+
+// ── Hình quán ─────────────────────────────────────────────────────────────────
 
 class _StoreImage extends StatelessWidget {
   final String? url;

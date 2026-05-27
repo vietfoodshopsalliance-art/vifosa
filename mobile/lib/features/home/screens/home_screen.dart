@@ -1,10 +1,15 @@
 // lib/features/home/screens/home_screen.dart
 
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/widgets/avatar_menu_button.dart';
 import '../../../features/auth/providers/auth_provider.dart';
+import '../models/food_item_card.dart';
 import '../providers/home_feed_provider.dart';
 import '../widgets/food_item_card_widget.dart';
 
@@ -116,7 +121,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     tooltip: 'Thông báo',
                     onPressed: () => context.push('/notifications'),
                   ),
-                if (isAuth) _AvatarMenuButton(user: user),
+                if (isAuth) AvatarMenuButton(user: user),
                 if (!isAuth)
                   TextButton(
                     onPressed: () => context.push('/login'),
@@ -133,7 +138,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ],
             ),
 
-            // ── Grid món ăn gần bạn ─────────────────────────────────────────
+            // ── Grid món ăn ─────────────────────────────────────────────────
             _FoodItemsSection(scrollCtrl: _scrollCtrl),
 
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
@@ -164,6 +169,7 @@ class _FoodItemsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(nearbyStoresProvider);
+    final isAuth = ref.watch(authProvider.select((s) => s.isAuthenticated));
 
     if (state.isLoading) {
       return const SliverFillRemaining(
@@ -202,7 +208,10 @@ class _FoodItemsSection extends ConsumerWidget {
       );
     }
 
-    if (state.items.isEmpty) {
+    // Xây danh sách slot theo thứ tự ưu tiên
+    final slots = _buildSlots(state, isAuth);
+
+    if (slots.isEmpty) {
       return const SliverFillRemaining(
         child: Center(
           child: Column(
@@ -241,7 +250,7 @@ class _FoodItemsSection extends ConsumerWidget {
                     size: 18, color: Color(0xFFF4B400)),
                 const SizedBox(width: 6),
                 const Text(
-                  'Món ăn gần bạn',
+                  'Món ngon gần bạn',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
@@ -264,14 +273,8 @@ class _FoodItemsSection extends ConsumerWidget {
               childAspectRatio: 0.72,
             ),
             delegate: SliverChildBuilderDelegate(
-              (_, i) {
-                final item = state.items[i];
-                return FoodItemCardWidget(
-                  item: item,
-                  onTap: () => context.push('/store/${item.storeId}'),
-                );
-              },
-              childCount: state.items.length,
+              (ctx, i) => _buildSlotWidget(ctx, slots[i]),
+              childCount: slots.length,
             ),
           ),
         ),
@@ -296,99 +299,134 @@ class _FoodItemsSection extends ConsumerWidget {
       ],
     );
   }
+
+  List<_GridSlot> _buildSlots(NearbyState state, bool isAuth) {
+    final slots = <_GridSlot>[];
+
+    // ô 1: món bán chạy nhất của quán mới mở nhất
+    if (state.newStoreItems.isNotEmpty) {
+      slots.add(_StaticSlot(state.newStoreItems[0]));
+    }
+    // ô 2: món bán chạy nhất của quán mới mở nhì
+    if (state.newStoreItems.length > 1) {
+      slots.add(_StaticSlot(state.newStoreItems[1]));
+    }
+    // ô 3: slideshow top 10 món bán chạy nhất all-time toàn quốc
+    if (state.topSellingItems.isNotEmpty) {
+      slots.add(_SlideshowSlot(state.topSellingItems, const ValueKey('slot_3')));
+    }
+    // ô 4: slideshow món bán chạy nhất của top 5 quán nhiều đánh giá nhất (5km)
+    if (state.topReviewedStoreItems.isNotEmpty) {
+      slots.add(_SlideshowSlot(state.topReviewedStoreItems, const ValueKey('slot_4')));
+    }
+    // ô 5: slideshow cá nhân (chỉ khi đăng nhập và có data)
+    if (isAuth && state.personalItems.isNotEmpty) {
+      slots.add(_SlideshowSlot(state.personalItems, const ValueKey('slot_5')));
+    }
+    // ô 6+: theo khoảng cách, gần đến xa
+    for (final item in state.items) {
+      slots.add(_StaticSlot(item));
+    }
+
+    return slots;
+  }
+
+  Widget _buildSlotWidget(BuildContext ctx, _GridSlot slot) {
+    if (slot is _SlideshowSlot) {
+      return _SlideshowCard(key: slot.key, items: slot.items);
+    }
+    final item = (slot as _StaticSlot).item;
+    return FoodItemCardWidget(
+      item: item,
+      onTap: () => ctx.push('/store/${item.storeId}'),
+    );
+  }
 }
 
-// ── Avatar menu button ────────────────────────────────────────────────────────
+// ── Grid slot types ───────────────────────────────────────────────────────────
 
-class _AvatarMenuButton extends ConsumerWidget {
-  final Map<String, dynamic>? user;
-  const _AvatarMenuButton({required this.user});
+sealed class _GridSlot {}
+
+class _StaticSlot extends _GridSlot {
+  final FoodItemCard item;
+  _StaticSlot(this.item);
+}
+
+class _SlideshowSlot extends _GridSlot {
+  final List<FoodItemCard> items;
+  final Key key;
+  _SlideshowSlot(this.items, this.key);
+}
+
+// ── Slideshow card ────────────────────────────────────────────────────────────
+
+class _SlideshowCard extends StatefulWidget {
+  final List<FoodItemCard> items;
+  const _SlideshowCard({super.key, required this.items});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final nickname = user?['nickname'] as String? ??
-        user?['username'] as String? ??
-        '';
-    final avatarUrl =
-        user?['avatarImage'] as String? ?? user?['avatar'] as String?;
+  State<_SlideshowCard> createState() => _SlideshowCardState();
+}
 
-    return PopupMenuButton<_MenuOption>(
-      offset: const Offset(0, 50),
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      onSelected: (option) => _onSelected(context, ref, option),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: _buildAvatar(avatarUrl, nickname),
-      ),
-      itemBuilder: (_) => [
-        _menuItem(_MenuOption.profile, Icons.person_outline, 'Profile'),
-        _menuItem(
-            _MenuOption.storeDashboard, Icons.storefront_outlined, 'Quản lý quán'),
-        const PopupMenuDivider(),
-        _menuItem(_MenuOption.logout, Icons.logout_rounded, 'Thoát',
-            destructive: true),
-      ],
-    );
+class _SlideshowCardState extends State<_SlideshowCard> {
+  int _idx = 0;
+  Timer? _cycleTimer;
+  Timer? _resumeTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.items.length > 1) _scheduleCycle();
   }
 
-  PopupMenuItem<_MenuOption> _menuItem(
-    _MenuOption option,
-    IconData icon,
-    String label, {
-    bool destructive = false,
-  }) {
-    final color =
-        destructive ? const Color(0xFFEF4444) : const Color(0xFF374151);
-    return PopupMenuItem(
-      value: option,
-      height: 44,
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 10),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 14, color: color, fontWeight: FontWeight.w500)),
-        ],
-      ),
-    );
+  void _scheduleCycle() {
+    _cycleTimer?.cancel();
+    final secs = 5 + Random().nextInt(4); // 5–8 giây
+    _cycleTimer = Timer(Duration(seconds: secs), () {
+      if (!mounted) return;
+      setState(() => _idx = (_idx + 1) % widget.items.length);
+      _scheduleCycle();
+    });
   }
 
-  Widget _buildAvatar(String? url, String nickname) {
-    const colors = [
-      Color(0xFF2563EB),
-      Color(0xFF10B981),
-      Color(0xFFF4B400),
-      Color(0xFFEF4444),
-      Color(0xFF8B5CF6),
-    ];
-    if (url != null && url.isNotEmpty) {
-      return CircleAvatar(radius: 15, backgroundImage: NetworkImage(url));
-    }
-    final color =
-        colors[(nickname.isNotEmpty ? nickname.codeUnitAt(0) : 0) % colors.length];
-    return CircleAvatar(
-      radius: 15,
-      backgroundColor: color,
-      child: Text(
-        nickname.isNotEmpty ? nickname[0].toUpperCase() : '?',
-        style: const TextStyle(
-            color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
-      ),
-    );
+  void _pause() {
+    _cycleTimer?.cancel();
+    _resumeTimer?.cancel();
   }
 
-  void _onSelected(BuildContext context, WidgetRef ref, _MenuOption option) {
-    switch (option) {
-      case _MenuOption.profile:
-        context.push('/profile');
-      case _MenuOption.storeDashboard:
-        context.push('/my-stores');
-      case _MenuOption.logout:
-        ref.read(authProvider.notifier).logout();
-    }
+  void _scheduleResume() {
+    _resumeTimer?.cancel();
+    if (widget.items.length <= 1) return;
+    _resumeTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) _scheduleCycle();
+    });
+  }
+
+  @override
+  void dispose() {
+    _cycleTimer?.cancel();
+    _resumeTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.items.isEmpty) return const SizedBox.shrink();
+    final item = widget.items[_idx];
+    return Listener(
+      onPointerDown: (_) => _pause(),
+      onPointerUp: (_) => _scheduleResume(),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 600),
+        transitionBuilder: (child, anim) =>
+            FadeTransition(opacity: anim, child: child),
+        child: FoodItemCardWidget(
+          key: ValueKey(_idx),
+          item: item,
+          onTap: () => context.push('/store/${item.storeId}'),
+        ),
+      ),
+    );
   }
 }
 
-enum _MenuOption { profile, storeDashboard, logout }

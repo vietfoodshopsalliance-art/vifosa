@@ -977,10 +977,11 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final systemBottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Padding(
       padding: EdgeInsets.only(
-          left: 20, right: 20, top: 20, bottom: 20 + bottomInset),
+          left: 20, right: 20, top: 20, bottom: 20 + bottomInset + systemBottomPadding),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

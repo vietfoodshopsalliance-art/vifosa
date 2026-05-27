@@ -188,17 +188,17 @@ class _StatsLine extends StatelessWidget {
     final parts = <String>[];
 
     if (item.avgRating > 0) {
-      parts.add('★ ${item.avgRating.toStringAsFixed(1)}');
+      final reviewSuffix = item.totalReviews > 0 ? ' (${_fmtNum(item.totalReviews)})' : '';
+      parts.add('★ ${_fmtRating(item.avgRating)}$reviewSuffix');
     }
-    if (item.totalReviews > 0) {
-      parts.add('${_fmtNum(item.totalReviews)} đg');
-    }
-    if (item.distanceKm != null) {
-      parts.add('${item.distanceKm!.toStringAsFixed(1)}km');
+    if (item.distanceKm != null && item.distanceKm! > 0) {
+      parts.add(_fmtDistance(item.distanceKm!));
     }
     if (item.soldCount > 0) {
       parts.add('${_fmtSold(item.soldCount)} đã bán');
     }
+
+    if (parts.isEmpty) return const SizedBox.shrink();
 
     return Text(
       parts.join(' · '),
@@ -210,6 +210,19 @@ class _StatsLine extends StatelessWidget {
         height: 1.2,
       ),
     );
+  }
+
+  // "5.0" → "5", "4.5" → "4.5"
+  String _fmtRating(double r) {
+    final s = r.toStringAsFixed(1);
+    return s.endsWith('.0') ? s.substring(0, s.length - 2) : s;
+  }
+
+  // < 1km → "300m"; >= 1km → "1.5km" hoặc "2km" (bỏ ".0" thừa)
+  String _fmtDistance(double km) {
+    if (km < 1.0) return '${(km * 1000).round()}m';
+    final s = km.toStringAsFixed(1);
+    return s.endsWith('.0') ? '${s.substring(0, s.length - 2)}km' : '${s}km';
   }
 
   String _fmtNum(int n) {

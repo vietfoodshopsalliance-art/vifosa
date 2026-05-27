@@ -47,6 +47,10 @@ final favoriteStoresProvider =
 // ── Nearby: stores + items (infinite scroll via cursor) ───────────────────────
 
 class NearbyState {
+  final List<FoodItemCard> newStoreItems;
+  final List<FoodItemCard> topSellingItems;
+  final List<FoodItemCard> topReviewedStoreItems;
+  final List<FoodItemCard> personalItems;
   final List<StoreCard> stores;
   final List<FoodItemCard> items;
   final bool isLoading;
@@ -56,6 +60,10 @@ class NearbyState {
   final int? nextCursor;
 
   const NearbyState({
+    this.newStoreItems = const [],
+    this.topSellingItems = const [],
+    this.topReviewedStoreItems = const [],
+    this.personalItems = const [],
     this.stores = const [],
     this.items = const [],
     this.isLoading = true,
@@ -66,6 +74,10 @@ class NearbyState {
   });
 
   NearbyState copyWith({
+    List<FoodItemCard>? newStoreItems,
+    List<FoodItemCard>? topSellingItems,
+    List<FoodItemCard>? topReviewedStoreItems,
+    List<FoodItemCard>? personalItems,
     List<StoreCard>? stores,
     List<FoodItemCard>? items,
     bool? isLoading,
@@ -75,6 +87,10 @@ class NearbyState {
     int? nextCursor,
   }) =>
       NearbyState(
+        newStoreItems: newStoreItems ?? this.newStoreItems,
+        topSellingItems: topSellingItems ?? this.topSellingItems,
+        topReviewedStoreItems: topReviewedStoreItems ?? this.topReviewedStoreItems,
+        personalItems: personalItems ?? this.personalItems,
         stores: stores ?? this.stores,
         items: items ?? this.items,
         isLoading: isLoading ?? this.isLoading,
@@ -103,6 +119,10 @@ class NearbyNotifier extends StateNotifier<NearbyState> {
     try {
       final data = await _ref.read(homeFeedDataProvider(_defaultRadius).future);
       state = NearbyState(
+        newStoreItems: data.newStoreItems,
+        topSellingItems: data.topSellingItems,
+        topReviewedStoreItems: data.topReviewedStoreItems,
+        personalItems: data.personalItems,
         stores: data.nearbyStores,
         items: data.nearbyItems,
         isLoading: false,
@@ -141,6 +161,10 @@ class NearbyNotifier extends StateNotifier<NearbyState> {
           .toList();
       final moreItems = parseFoodItems(d['nearbyItems']);
       state = NearbyState(
+        newStoreItems: state.newStoreItems,
+        topSellingItems: state.topSellingItems,
+        topReviewedStoreItems: state.topReviewedStoreItems,
+        personalItems: state.personalItems,
         stores: [...state.stores, ...moreStores],
         items: [...state.items, ...moreItems],
         isLoading: false,

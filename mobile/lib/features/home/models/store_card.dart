@@ -14,6 +14,7 @@ class StoreCard {
   final bool emergencyClosed;
   final double avgRating;
   final int totalReviews;
+  final int totalSold;
   final String vipTier;
 
   const StoreCard({
@@ -28,6 +29,7 @@ class StoreCard {
     required this.emergencyClosed,
     required this.avgRating,
     required this.totalReviews,
+    this.totalSold = 0,
     required this.vipTier,
   });
 
@@ -43,6 +45,7 @@ class StoreCard {
         emergencyClosed: j['emergencyClosed'] as bool? ?? false,
         avgRating: (j['avgRating'] as num?)?.toDouble() ?? 0.0,
         totalReviews: j['totalReviews'] as int? ?? 0,
+        totalSold: j['totalSold'] as int? ?? 0,
         vipTier: j['vipTier'] as String? ?? 'none',
       );
 
@@ -55,6 +58,10 @@ List<StoreCard> _parseList(dynamic raw) =>
         .toList();
 
 class HomeFeedData {
+  final List<FoodItemCard> newStoreItems;
+  final List<FoodItemCard> topSellingItems;
+  final List<FoodItemCard> topReviewedStoreItems;
+  final List<FoodItemCard> personalItems;
   final List<StoreCard> newStores;
   final List<StoreCard> trendingStores;
   final List<StoreCard> recentPurchases;
@@ -65,6 +72,10 @@ class HomeFeedData {
   final bool hasMore;
 
   const HomeFeedData({
+    this.newStoreItems = const [],
+    this.topSellingItems = const [],
+    this.topReviewedStoreItems = const [],
+    this.personalItems = const [],
     this.newStores = const [],
     this.trendingStores = const [],
     this.recentPurchases = const [],
@@ -76,6 +87,10 @@ class HomeFeedData {
   });
 
   factory HomeFeedData.fromJson(Map<String, dynamic> j) => HomeFeedData(
+        newStoreItems: parseFoodItems(j['newStoreItems']),
+        topSellingItems: parseFoodItems(j['topSellingItems']),
+        topReviewedStoreItems: parseFoodItems(j['topReviewedStoreItems']),
+        personalItems: parseFoodItems(j['personalItems']),
         newStores: _parseList(j['newStores']),
         trendingStores: _parseList(j['trendingStores']),
         recentPurchases: _parseList(j['recentPurchases']),

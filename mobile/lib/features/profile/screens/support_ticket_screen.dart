@@ -119,7 +119,7 @@ class _SupportTicketScreenState extends State<SupportTicketScreen> {
           padding: const EdgeInsets.all(16),
           children: [
             const Text(
-              'Phản hồi của bạn sẽ được gửi đến team Vifosa. '
+              'Phản hồi của bạn sẽ được gửi đến team Viet Shops. '
               'Chúng tôi sẽ xem xét và phản hồi qua ứng dụng.',
               style: TextStyle(color: Colors.grey, fontSize: 13),
             ),

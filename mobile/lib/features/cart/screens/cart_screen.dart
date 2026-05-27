@@ -132,6 +132,7 @@ class CartNotifier extends StateNotifier<CartState> {
   static const _hiveNoteKey = 'note';
   static const _hiveStoreIdKey = 'storeId';
   static const _hiveStoreNameKey = 'storeName';
+  static const _hiveUserIdKey = 'cartUserId';
 
   CartNotifier(this._ref) : super(const CartState()) {
     _init();
@@ -145,8 +146,18 @@ class CartNotifier extends StateNotifier<CartState> {
     await _loadFromHive();
   }
 
-  // Public: restore cart từ Hive (gọi sau khi login)
-  Future<void> syncFromHive() => _loadFromHive();
+  // Public: restore cart từ Hive sau khi login.
+  // Nếu cart Hive thuộc account khác → xóa sạch thay vì restore.
+  Future<void> syncFromHive({String? loginUserId}) async {
+    final box = await Hive.openBox(_boxKey);
+    final storedUserId = box.get(_hiveUserIdKey) as String?;
+    if (storedUserId != null && loginUserId != null && storedUserId != loginUserId) {
+      state = const CartState();
+      await box.clear();
+      return;
+    }
+    await _loadFromHive();
+  }
 
   // ── Server sync (logged-in) ───────────────────────────────────────────────
 
@@ -306,10 +317,12 @@ class CartNotifier extends StateNotifier<CartState> {
 
   Future<void> _persistHive() async {
     final box = await Hive.openBox(_boxKey);
-    await box.put(_hiveItemsKey,   state.items.map((e) => e.toJson()).toList());
-    await box.put(_hiveNoteKey,    state.note);
-    await box.put(_hiveStoreIdKey, state.storeId);
+    final userId = _ref.read(authProvider).user?['_id'] as String?;
+    await box.put(_hiveItemsKey,    state.items.map((e) => e.toJson()).toList());
+    await box.put(_hiveNoteKey,     state.note);
+    await box.put(_hiveStoreIdKey,  state.storeId);
     await box.put(_hiveStoreNameKey, state.storeName);
+    await box.put(_hiveUserIdKey,   userId);
   }
 }
 
@@ -324,9 +337,10 @@ final cartProvider = StateNotifierProvider<CartNotifier, CartState>((ref) {
     final wasLoggedIn = prev?.user != null;
     final isLoggedIn  = next.user != null;
     if (wasLoggedIn && !isLoggedIn) {
-      notifier.clearLocal(); // logout: xóa in-memory, Hive vẫn giữ để restore sau
+      notifier.clearLocal(); // logout: xóa in-memory, Hive giữ để đăng nhập lại
     } else if (!wasLoggedIn && isLoggedIn) {
-      notifier.syncFromHive(); // login: restore từ Hive (backend cart chưa có endpoint)
+      final userId = next.user?['_id'] as String?;
+      notifier.syncFromHive(loginUserId: userId); // cùng account → restore, khác → clear
     }
   });
   return notifier;

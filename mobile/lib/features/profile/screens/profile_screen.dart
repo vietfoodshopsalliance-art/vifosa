@@ -57,6 +57,36 @@ class _RatingSummary {
   const _RatingSummary({required this.avg, required this.count});
 }
 
+class _OrderStats {
+  final int completed;
+  final int total;
+  const _OrderStats({required this.completed, required this.total});
+}
+
+final _myOrderStatsProvider = FutureProvider.autoDispose<_OrderStats>((ref) async {
+  try {
+    final res = await DioClient.instance.get('/me/order-stats');
+    final data = res.data as Map<String, dynamic>? ?? {};
+    return _OrderStats(
+      completed: (data['completedCount'] as num?)?.toInt() ?? 0,
+      total: (data['totalOrders'] as num?)?.toInt() ?? 0,
+    );
+  } catch (_) {
+    return const _OrderStats(completed: 0, total: 0);
+  }
+});
+
+final _myReviewCountProvider = FutureProvider.autoDispose<int>((ref) async {
+  try {
+    final res = await DioClient.instance
+        .get('/me/reviews-given', queryParameters: {'limit': 1, 'page': 1});
+    final data = res.data as Map<String, dynamic>? ?? {};
+    return (data['total'] as num?)?.toInt() ?? 0;
+  } catch (_) {
+    return 0;
+  }
+});
+
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 class ProfileScreen extends ConsumerWidget {
@@ -72,7 +102,9 @@ class ProfileScreen extends ConsumerWidget {
     final avatarUrl  = user['avatarImage'] as String? ?? user['avatar'] as String?;
     final nickname   = user['nickname'] as String? ?? '';
     final username   = user['username'] as String? ?? '';
-    final ratingAsync = ref.watch(_myRatingProvider);
+    final ratingAsync      = ref.watch(_myRatingProvider);
+    final orderStatsAsync  = ref.watch(_myOrderStatsProvider);
+    final reviewCountAsync = ref.watch(_myReviewCountProvider);
 
     return Scaffold(
       backgroundColor: _bg,
@@ -102,9 +134,13 @@ class ProfileScreen extends ConsumerWidget {
         onRefresh: () async {
           ref.invalidate(_myRatingProvider);
           ref.invalidate(_defaultAddressProvider);
+          ref.invalidate(_myOrderStatsProvider);
+          ref.invalidate(_myReviewCountProvider);
           await Future.wait([
             ref.read(_myRatingProvider.future),
             ref.read(_defaultAddressProvider.future),
+            ref.read(_myOrderStatsProvider.future),
+            ref.read(_myReviewCountProvider.future),
           ]);
         },
         child: ListView(
@@ -117,6 +153,8 @@ class ProfileScreen extends ConsumerWidget {
               username: username,
               roles: roles,
               ratingAsync: ratingAsync,
+              orderStatsAsync: orderStatsAsync,
+              reviewCountAsync: reviewCountAsync,
               onTapRating: () => context.push('/profile/my-rating'),
             ),
 
@@ -175,9 +213,16 @@ class ProfileScreen extends ConsumerWidget {
             const _SectionLabel('Hỗ trợ'),
             _MenuCard(children: [
               _MenuTile(
+                icon: Icons.volunteer_activism_outlined,
+                label: 'Hỗ trợ chúng tôi',
+                subtitle: 'Duy trì phần mềm miễn phí, chiết khấu quán 0%',
+                onTap: () => context.push('/profile/support-us'),
+              ),
+              const _MenuDivider(),
+              _MenuTile(
                 icon: Icons.bug_report_outlined,
                 label: 'Báo lỗi / Đề xuất',
-                subtitle: 'Gửi phản hồi cho team Vifosa',
+                subtitle: 'Gửi phản hồi cho team Viet Shops',
                 onTap: () => context.push('/profile/support'),
               ),
               const _MenuDivider(),
@@ -247,6 +292,8 @@ class _ProfileHeaderCard extends StatelessWidget {
   final String username;
   final List<String> roles;
   final AsyncValue<_RatingSummary?> ratingAsync;
+  final AsyncValue<_OrderStats> orderStatsAsync;
+  final AsyncValue<int> reviewCountAsync;
   final VoidCallback onTapRating;
 
   const _ProfileHeaderCard({
@@ -255,15 +302,27 @@ class _ProfileHeaderCard extends StatelessWidget {
     required this.username,
     required this.roles,
     required this.ratingAsync,
+    required this.orderStatsAsync,
+    required this.reviewCountAsync,
     required this.onTapRating,
   });
 
   @override
   Widget build(BuildContext context) {
-    final displayName = nickname.isNotEmpty ? nickname : username;
-    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
-    final visibleRoles =
-        roles.where((r) => r == 'admin' || r == 'mod').toList();
+    final displayName  = nickname.isNotEmpty ? nickname : username;
+    final initial      = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
+    final visibleRoles = roles.where((r) => r == 'admin' || r == 'mod').toList();
+
+    final summary     = ratingAsync.maybeWhen(data: (d) => d, orElse: () => null);
+    final stats       = orderStatsAsync.maybeWhen(data: (d) => d, orElse: () => null);
+    final reviewCount = reviewCountAsync.maybeWhen(data: (d) => d, orElse: () => null);
+
+    final ordPct = (stats != null && stats.total > 0)
+        ? (stats.completed / stats.total * 100).round()
+        : null;
+    final revPct = (stats != null && stats.completed > 0 && reviewCount != null)
+        ? (reviewCount / stats.completed * 100).round()
+        : null;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 4, 16, 0),
@@ -325,45 +384,71 @@ class _ProfileHeaderCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
 
-                Row(
+                // ── Stats row ─────────────────────────────────────────────
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  runSpacing: 2,
                   children: [
                     Text(
                       '@$username',
-                      style: const TextStyle(color: _txtSub, fontSize: 13),
+                      style: const TextStyle(color: _txtSub, fontSize: 12.5),
                     ),
-                    ratingAsync.when(
-                      loading: () => const SizedBox.shrink(),
-                      error: (_, __) => const SizedBox.shrink(),
-                      data: (summary) {
-                        if (summary == null) return const SizedBox.shrink();
-                        return GestureDetector(
-                          onTap: onTapRating,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const SizedBox(width: 8),
-                              const Icon(Icons.star_rounded,
-                                  size: 13, color: _accent),
-                              const SizedBox(width: 2),
-                              Text(
-                                summary.avg.toStringAsFixed(1),
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: _txtMain,
-                                ),
+                    // ★ điểm bởi chủ quán (số lần)
+                    if (summary != null)
+                      GestureDetector(
+                        onTap: onTapRating,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(' · ', style: TextStyle(color: _txtSub, fontSize: 12)),
+                            const Icon(Icons.star_rounded, size: 12, color: _accent),
+                            const SizedBox(width: 2),
+                            Text(
+                              summary.avg.toStringAsFixed(1),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: _txtMain,
                               ),
-                              const SizedBox(width: 2),
-                              Text(
-                                '(${summary.count})',
-                                style: const TextStyle(
-                                    fontSize: 11, color: _txtSub),
-                              ),
-                            ],
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              '(${summary.count})',
+                              style: const TextStyle(fontSize: 11, color: _txtSub),
+                            ),
+                          ],
+                        ),
+                      ),
+                    // đơn hoàn thành (%)
+                    if (ordPct != null)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(' · ', style: TextStyle(color: _txtSub, fontSize: 12)),
+                          const Icon(Icons.shopping_bag_outlined, size: 12, color: _txtSub),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${stats!.completed} ($ordPct%)',
+                            style: const TextStyle(fontSize: 12, color: _txtSub),
                           ),
-                        );
-                      },
-                    ),
+                        ],
+                      ),
+                    // số lần đánh giá (%)
+                    if (reviewCount != null && ordPct != null)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(' · ', style: TextStyle(color: _txtSub, fontSize: 12)),
+                          const Icon(Icons.rate_review_outlined, size: 12, color: _txtSub),
+                          const SizedBox(width: 2),
+                          Text(
+                            revPct != null
+                                ? '$reviewCount ($revPct%)'
+                                : '$reviewCount',
+                            style: const TextStyle(fontSize: 12, color: _txtSub),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
 
