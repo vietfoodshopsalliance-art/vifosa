@@ -28,13 +28,27 @@ class OrdersScreen extends ConsumerWidget {
     return DefaultTabController(
       length: 3,
       child: Scaffold(
+        backgroundColor: const Color(0xFFF7F2E8),
         appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          scrolledUnderElevation: 1,
+          shadowColor: Colors.black12,
+          surfaceTintColor: Colors.transparent,
+          foregroundColor: Colors.black87,
           leading: IconButton(
             icon: const Icon(Icons.home_outlined),
             onPressed: () => context.go('/home'),
           ),
-          title: const Text('Đơn hàng của tôi'),
+          title: const Text(
+            'Đơn hàng của tôi',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+          ),
           bottom: const TabBar(
+            labelColor: Color(0xFFF4B400),
+            unselectedLabelColor: Colors.black54,
+            indicatorColor: Color(0xFFF4B400),
+            indicatorWeight: 2.5,
             tabs: [
               Tab(text: 'Chờ xử lý'),
               Tab(text: 'Đang làm'),
@@ -63,6 +77,7 @@ class _OrdersTab extends ConsumerWidget {
     final ordersAsync = ref.watch(ordersListProvider(tab));
 
     return RefreshIndicator(
+      color: const Color(0xFFF4B400),
       onRefresh: () async => ref.invalidate(ordersListProvider(tab)),
       child: ordersAsync.when(
         data: (orders) => orders.isEmpty
@@ -72,9 +87,10 @@ class _OrdersTab extends ConsumerWidget {
                   Center(
                     child: Column(
                       children: [
-                        Icon(Icons.receipt_long, size: 64, color: Colors.grey),
+                        Icon(Icons.receipt_long_outlined, size: 64, color: Colors.black26),
                         SizedBox(height: 12),
-                        Text('Không có đơn hàng', style: TextStyle(color: Colors.grey)),
+                        Text('Không có đơn hàng',
+                            style: TextStyle(color: Colors.black45, fontSize: 14)),
                       ],
                     ),
                   ),
@@ -86,13 +102,23 @@ class _OrdersTab extends ConsumerWidget {
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (ctx, i) => _OrderCard(order: orders[i]),
               ),
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFF4B400))),
         error: (_, __) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text('Không thể tải đơn hàng'),
-              TextButton(
+              const Icon(Icons.wifi_off_outlined, size: 56, color: Colors.black26),
+              const SizedBox(height: 12),
+              const Text('Không thể tải đơn hàng',
+                  style: TextStyle(color: Colors.black45)),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF4B400),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
                 onPressed: () => ref.invalidate(ordersListProvider(tab)),
                 child: const Text('Thử lại'),
               ),
@@ -110,7 +136,6 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final status = order['mainStatus'] as String? ?? '';
     final storeRaw = order['storeId'];
     final storeName = storeRaw is Map ? (storeRaw['name'] as String? ?? '') : '';
@@ -119,6 +144,13 @@ class _OrderCard extends StatelessWidget {
         : '';
 
     return Card(
+      color: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0xFFEEEEEE), width: 0.8),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => context.push('/order/${order['_id']}'),
@@ -151,9 +183,9 @@ class _OrderCard extends StatelessWidget {
                   ),
                   Text(
                     _vnd.format(order['totalAmount'] ?? 0),
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.primary,
+                      color: Color(0xFFF4B400),
                     ),
                   ),
                 ],

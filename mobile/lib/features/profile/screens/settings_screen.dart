@@ -242,7 +242,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
       _error = null;
     });
     try {
-      await DioClient.instance.put(ApiEndpoints.changePassword, data: {
+      await DioClient.instance.post(ApiEndpoints.changePassword, data: {
         'oldPassword': _oldPassCtrl.text,
         'newPassword': _newPassCtrl.text,
       });

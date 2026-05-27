@@ -11,7 +11,7 @@ class ApiEndpoints {
   static const String refresh        = '/auth/refresh';
   static const String logout         = '/auth/logout';
   static const String logoutAll      = '/auth/logout-all';
-  static const String changePassword = '/auth/change-password';
+  static const String changePassword = '/me/change-password';
   static const String tosAccept      = '/tos/accept';
 
   // ── Me ────────────────────────────────────────────────────────────────────

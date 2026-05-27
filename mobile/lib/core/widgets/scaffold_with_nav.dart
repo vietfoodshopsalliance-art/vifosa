@@ -68,14 +68,20 @@ class _CustomNavBar extends StatelessWidget {
           height: 60,
           child: Row(
             children: [
-              // ── Trang chủ (luôn hiện dropdown khi tap) ──────────────────
+              // ── Trang chủ (dropdown chỉ hiện khi đang ở tab home) ───────
               Builder(builder: (ctx) {
                 return _NavItem(
                   icon: Icons.home_outlined,
                   selectedIcon: Icons.home_rounded,
                   label: 'Trang chủ',
                   selected: currentIndex == 0,
-                  onTap: () => _showHomeMenu(ctx),
+                  onTap: () {
+                    if (currentIndex == 0) {
+                      _showHomeMenu(ctx);
+                    } else {
+                      onBranchSelected(0);
+                    }
+                  },
                 );
               }),
 
@@ -136,18 +142,22 @@ class _CustomNavBar extends StatelessWidget {
     showMenu<String>(
       context: context,
       position: pos,
+      color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       elevation: 8,
       items: [
-        _menuItem('home', Icons.home_rounded, 'Trang chủ'),
-        _menuItem('search', Icons.search_rounded, 'Tìm kiếm'),
+        _menuItemComingSoon(
+            'housewares', Icons.home_repair_service_rounded, 'Đồ gia dụng'),
         const PopupMenuDivider(height: 1),
         _menuItemComingSoon(
-            'trending', Icons.local_fire_department_rounded, 'Món bán chạy'),
+            'promo', Icons.local_offer_rounded, 'Món khuyến mãi'),
         _menuItemComingSoon(
             'top_rated', Icons.star_rounded, 'Món điểm cao'),
         _menuItemComingSoon(
-            'promo', Icons.local_offer_rounded, 'Món khuyến mãi'),
+            'trending', Icons.local_fire_department_rounded, 'Món bán chạy'),
+        const PopupMenuDivider(height: 1),
+        _menuItem('search', Icons.search_rounded, 'Tìm kiếm'),
+        _menuItem('home', Icons.home_rounded, 'Trang chủ'),
       ],
     ).then((value) {
       if (value == null || !context.mounted) return;

@@ -72,7 +72,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 children: [
                   Image.asset(
                     'assets/images/vietshop_logo_ngang.png',
-                    height: 22,
+                    height: 14,
                     fit: BoxFit.contain,
                   ),
                   const SizedBox(width: 12),
@@ -314,6 +314,7 @@ class _AvatarMenuButton extends ConsumerWidget {
 
     return PopupMenuButton<_MenuOption>(
       offset: const Offset(0, 50),
+      color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       onSelected: (option) => _onSelected(context, ref, option),
       child: Padding(

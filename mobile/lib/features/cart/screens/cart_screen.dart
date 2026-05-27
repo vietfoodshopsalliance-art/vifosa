@@ -502,18 +502,28 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     });
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF7F2E8),
       appBar: AppBar(
-  leading: IconButton(
-    icon: const Icon(Icons.home_outlined),
-    onPressed: () => context.go('/home'),
-  ),
-  title: const Text('Giỏ hàng'),
-  actions: [
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 1,
+        shadowColor: Colors.black12,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: Colors.black87,
+        leading: IconButton(
+          icon: const Icon(Icons.home_outlined),
+          onPressed: () => context.go('/home'),
+        ),
+        title: const Text(
+          'Giỏ hàng',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+        ),
+        actions: [
           if (!cart.isEmpty)
             TextButton(
               onPressed: _confirmClear,
-              child:
-                  const Text('Xoá tất cả', style: TextStyle(color: Colors.red)),
+              child: const Text('Xoá tất cả',
+                  style: TextStyle(color: Color(0xFFEF4444))),
             ),
         ],
       ),
@@ -528,22 +538,28 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.shopping_cart_outlined, size: 80, color: Colors.grey),
+          const Icon(Icons.shopping_cart_outlined, size: 72, color: Colors.black26),
           const SizedBox(height: 16),
           const Text(
             'Giỏ hàng trống',
-            style: TextStyle(fontSize: 18, color: Colors.grey),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF1A1A1A)),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           const Text(
             'Hãy thêm món ăn để bắt đầu',
-            style: TextStyle(color: Colors.grey),
+            style: TextStyle(color: Colors.black45, fontSize: 13),
           ),
           const SizedBox(height: 24),
-          OutlinedButton.icon(
+          ElevatedButton.icon(
             onPressed: () => context.go('/home'),
-            icon: const Icon(Icons.home_outlined),
-            label: const Text('Về trang chủ'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF4B400),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            icon: const Icon(Icons.home_rounded, size: 18),
+            label: const Text('Về trang chủ', style: TextStyle(fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -581,10 +597,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                           const SizedBox(width: 8),
                           Text(
                             cart.storeName!,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
-                              color: theme.colorScheme.primary,
+                              color: Color(0xFFF4B400),
                             ),
                           ),
                           const SizedBox(width: 4),
@@ -608,10 +624,23 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 controller: _noteCtrl,
                 onChanged: _onNoteChanged,
                 maxLines: 2,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Ghi chú cho quán (tuỳ chọn)',
-                  border: OutlineInputBorder(),
                   hintText: 'VD: Ít đá, không hành...',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFFF4B400), width: 1.5),
+                  ),
                 ),
               ),
             ],
@@ -622,7 +651,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         Container(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           decoration: BoxDecoration(
-            color: theme.cardColor,
+            color: Colors.white,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.08),
@@ -691,7 +720,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           style: TextStyle(
             fontSize: bold ? 17 : 14,
             fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-            color: bold ? theme.colorScheme.primary : (color ?? Colors.grey.shade700),
+            color: bold ? const Color(0xFFF4B400) : (color ?? Colors.grey.shade700),
           ),
         ),
       ],
@@ -734,12 +763,18 @@ class _CartItemTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final atStockLimit =
         item.stock != null && item.quantity >= item.stock!;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
+      color: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0xFFEEEEEE), width: 0.8),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(10),
         child: Row(
@@ -771,8 +806,8 @@ class _CartItemTile extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     _vnd.format(item.price),
-                    style: TextStyle(
-                        color: theme.colorScheme.primary, fontSize: 13),
+                    style: const TextStyle(
+                        color: Color(0xFFF4B400), fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
                   Row(

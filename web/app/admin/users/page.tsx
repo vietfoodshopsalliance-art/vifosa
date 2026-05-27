@@ -92,8 +92,8 @@ export default function AdminUsersPage() {
 
   async function resetPassword(user: User) {
     try {
-      const res = await api.post<{ tempPassword: string }>(`/admin/users/${user._id}/reset-password`, {})
-      setTempPw(res.tempPassword)
+      const res = await api.post<{ success: boolean; data: { newPassword: string } }>(`/admin/users/${user._id}/reset-password`, {})
+      setTempPw(res.data.newPassword)
       setModal({ type: 'reset', user })
     } catch { setActionMsg('Có lỗi xảy ra.') }
   }

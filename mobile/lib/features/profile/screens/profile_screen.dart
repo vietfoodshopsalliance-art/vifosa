@@ -7,6 +7,15 @@ import '../../../core/network/dio_client.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/address_model.dart';
 
+// ── Brand colours (same palette as home screen) ───────────────────────────────
+const _bg       = Color(0xFFF7F2E8);
+const _card     = Colors.white;
+const _accent   = Color(0xFFF4B400);
+const _txtMain  = Color(0xFF1A1200);
+const _txtSub   = Color(0xFF8A7862);
+const _iconBg   = Color(0xFFF2EDE0);
+const _divider  = Color(0xFFF0E8D8);
+
 // ── Providers ─────────────────────────────────────────────────────────────────
 
 final _myRatingProvider = FutureProvider.autoDispose<_RatingSummary?>((ref) async {
@@ -26,7 +35,6 @@ final _myRatingProvider = FutureProvider.autoDispose<_RatingSummary?>((ref) asyn
 });
 
 final _defaultAddressProvider = FutureProvider<AddressModel?>((ref) async {
-  // Re-fetches automatically when a different user logs in
   ref.watch(authProvider.select((s) => s.user?['_id']));
   try {
     final res = await DioClient.instance.get('/me/addresses');
@@ -49,38 +57,48 @@ class _RatingSummary {
   const _RatingSummary({required this.avg, required this.count});
 }
 
-// ---------------------------------------------------------------------------
-// Screen
-// ---------------------------------------------------------------------------
+// ── Screen ────────────────────────────────────────────────────────────────────
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authProvider);
-    final user = authState.user ?? {};
-
-    final roles = (user['roles'] as List<dynamic>? ?? []).cast<String>();
+    final authState  = ref.watch(authProvider);
+    final user       = authState.user ?? {};
+    final roles      = (user['roles'] as List<dynamic>? ?? []).cast<String>();
     final ownedStores = (user['ownedStores'] as List<dynamic>? ?? []);
     final isStoreOwner = roles.contains('store_owner') || ownedStores.isNotEmpty;
-    final avatarUrl = user['avatarImage'] as String? ?? user['avatar'] as String?;
-    final nickname = user['nickname'] as String? ?? '';
-    final username = user['username'] as String? ?? '';
+    final avatarUrl  = user['avatarImage'] as String? ?? user['avatar'] as String?;
+    final nickname   = user['nickname'] as String? ?? '';
+    final username   = user['username'] as String? ?? '';
     final ratingAsync = ref.watch(_myRatingProvider);
 
     return Scaffold(
+      backgroundColor: _bg,
       appBar: AppBar(
-        title: const Text('Hồ sơ'),
+        backgroundColor: _card,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.black12,
+        title: const Text(
+          'Hồ sơ',
+          style: TextStyle(
+            color: _txtMain,
+            fontWeight: FontWeight.w700,
+            fontSize: 17,
+          ),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.edit_outlined),
+            icon: const Icon(Icons.edit_outlined, color: _txtMain),
             tooltip: 'Chỉnh sửa hồ sơ',
             onPressed: () => context.push('/profile/edit'),
           ),
         ],
       ),
       body: RefreshIndicator(
+        color: _accent,
         onRefresh: () async {
           ref.invalidate(_myRatingProvider);
           ref.invalidate(_defaultAddressProvider);
@@ -90,9 +108,10 @@ class ProfileScreen extends ConsumerWidget {
           ]);
         },
         child: ListView(
+          padding: const EdgeInsets.symmetric(vertical: 12),
           children: [
-            // ── Header ───────────────────────────────────────────────────────
-            _ProfileHeader(
+            // ── Profile header card ──────────────────────────────────────────
+            _ProfileHeaderCard(
               avatarUrl: avatarUrl,
               nickname: nickname,
               username: username,
@@ -101,90 +120,84 @@ class ProfileScreen extends ConsumerWidget {
               onTapRating: () => context.push('/profile/my-rating'),
             ),
 
-            const SizedBox(height: 8),
-            const Divider(height: 1),
-
-            // ── Section: Tài khoản ────────────────────────────────────────────
-            _SectionLabel('Tài khoản'),
-            _AddressSection(),
-            _MenuItem(
-              icon: Icons.payment_outlined,
-              label: 'Phương thức thanh toán',
-              subtitle: 'Cài đặt mặc định & TK nhận hoàn',
-              onTap: () => context.push('/profile/payment-methods'),
-            ),
-
-            const Divider(height: 1),
-
-            // ── Section: Yêu thích & Đánh giá ────────────────────────────────
-            _SectionLabel('Yêu thích & Đánh giá'),
-            _MenuItem(
-              icon: Icons.favorite_outline,
-              label: 'Yêu thích',
-              subtitle: 'Món và quán yêu thích của tôi',
-              onTap: () => context.push('/favorites'),
-            ),
-            _MenuItem(
-              icon: Icons.rate_review_outlined,
-              label: 'Quán đã đánh giá',
-              subtitle: 'Xem lại các review tôi đã viết',
-              onTap: () => context.push('/profile/my-reviews'),
-            ),
-            _MenuItem(
-              icon: Icons.explore_outlined,
-              label: 'Khám phá',
-              subtitle: 'Bảng xếp hạng & thống kê cộng đồng',
-              onTap: () => _showExploreSheet(context),
-            ),
-
-            const Divider(height: 1),
-
-            // ── Section: Quán của tôi ─────────────────────────────────────────
-            if (isStoreOwner) ...[
-              _SectionLabel('Quán của tôi'),
-              _MenuItem(
-                icon: Icons.store_outlined,
-                label: 'Quản lý quán',
-                subtitle: 'Dashboard đơn hàng, menu, cài đặt',
-                onTap: () => context.push('/my-stores'),
+            // ── Tài khoản ────────────────────────────────────────────────────
+            const _SectionLabel('Tài khoản'),
+            _MenuCard(children: [
+              const _AddressTile(),
+              const _MenuDivider(),
+              _MenuTile(
+                icon: Icons.payment_outlined,
+                label: 'Phương thức thanh toán',
+                subtitle: 'Cài đặt mặc định & TK nhận hoàn',
+                onTap: () => context.push('/profile/payment-methods'),
               ),
-              const Divider(height: 1),
+            ]),
+
+            // ── Yêu thích & Đánh giá ─────────────────────────────────────────
+            const _SectionLabel('Yêu thích & Đánh giá'),
+            _MenuCard(children: [
+              _MenuTile(
+                icon: Icons.favorite_outline,
+                label: 'Yêu thích',
+                subtitle: 'Món và quán yêu thích của tôi',
+                onTap: () => context.push('/favorites'),
+              ),
+              const _MenuDivider(),
+              _MenuTile(
+                icon: Icons.rate_review_outlined,
+                label: 'Quán đã đánh giá',
+                subtitle: 'Xem lại các review tôi đã viết',
+                onTap: () => context.push('/profile/my-reviews'),
+              ),
+              const _MenuDivider(),
+              _MenuTile(
+                icon: Icons.explore_outlined,
+                label: 'Khám phá',
+                subtitle: 'Bảng xếp hạng & thống kê cộng đồng',
+                onTap: () => _showExploreSheet(context),
+              ),
+            ]),
+
+            // ── Quán của tôi (store owner only) ─────────────────────────────
+            if (isStoreOwner) ...[
+              const _SectionLabel('Quán của tôi'),
+              _MenuCard(children: [
+                _MenuTile(
+                  icon: Icons.store_outlined,
+                  label: 'Quản lý quán',
+                  subtitle: 'Dashboard đơn hàng, menu, cài đặt',
+                  onTap: () => context.push('/my-stores'),
+                ),
+              ]),
             ],
 
-            // ── Section: Hỗ trợ ───────────────────────────────────────────────
-            _SectionLabel('Hỗ trợ'),
-            _MenuItem(
-              icon: Icons.bug_report_outlined,
-              label: 'Báo lỗi / Đề xuất',
-              subtitle: 'Gửi phản hồi cho team Vifosa',
-              onTap: () => context.push('/profile/support'),
-            ),
-            _MenuItem(
-              icon: Icons.settings_outlined,
-              label: 'Cài đặt',
-              subtitle: 'Mật khẩu, thông báo, tài khoản',
-              onTap: () => context.push('/profile/settings'),
-            ),
+            // ── Hỗ trợ ───────────────────────────────────────────────────────
+            const _SectionLabel('Hỗ trợ'),
+            _MenuCard(children: [
+              _MenuTile(
+                icon: Icons.bug_report_outlined,
+                label: 'Báo lỗi / Đề xuất',
+                subtitle: 'Gửi phản hồi cho team Vifosa',
+                onTap: () => context.push('/profile/support'),
+              ),
+              const _MenuDivider(),
+              _MenuTile(
+                icon: Icons.settings_outlined,
+                label: 'Cài đặt',
+                subtitle: 'Mật khẩu, thông báo, tài khoản',
+                onTap: () => context.push('/profile/settings'),
+              ),
+            ]),
 
-            const Divider(height: 1),
             const SizedBox(height: 8),
 
-            // ── Logout ────────────────────────────────────────────────────────
+            // ── Đăng xuất ────────────────────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.logout, color: Colors.red),
-                label: const Text('Đăng xuất',
-                    style: TextStyle(color: Colors.red)),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
-                  side: const BorderSide(color: Colors.red),
-                ),
-                onPressed: () => _confirmLogout(context, ref),
-              ),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+              child: _LogoutCard(onTap: () => _confirmLogout(context, ref)),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
           ],
         ),
       ),
@@ -195,7 +208,7 @@ class ProfileScreen extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => _ExploreSheet(parentContext: context),
     );
@@ -218,8 +231,7 @@ class ProfileScreen extends ConsumerWidget {
               await ref.read(authProvider.notifier).logout();
               if (context.mounted) context.go('/login');
             },
-            child:
-                const Text('Đăng xuất', style: TextStyle(color: Colors.red)),
+            child: const Text('Đăng xuất', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -227,11 +239,9 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Profile Header
-// ---------------------------------------------------------------------------
+// ── Profile Header Card ───────────────────────────────────────────────────────
 
-class _ProfileHeader extends StatelessWidget {
+class _ProfileHeaderCard extends StatelessWidget {
   final String? avatarUrl;
   final String nickname;
   final String username;
@@ -239,7 +249,7 @@ class _ProfileHeader extends StatelessWidget {
   final AsyncValue<_RatingSummary?> ratingAsync;
   final VoidCallback onTapRating;
 
-  const _ProfileHeader({
+  const _ProfileHeaderCard({
     required this.avatarUrl,
     required this.nickname,
     required this.username,
@@ -250,45 +260,76 @@ class _ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initial = nickname.isNotEmpty ? nickname[0].toUpperCase() : 'U';
-    // Chỉ hiện badge cho admin/mod — ẩn customer/store_owner
+    final displayName = nickname.isNotEmpty ? nickname : username;
+    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
     final visibleRoles =
         roles.where((r) => r == 'admin' || r == 'mod').toList();
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.07),
+            blurRadius: 18,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Row(
         children: [
-          // Avatar
-          CircleAvatar(
-            radius: 40,
-            backgroundImage:
-                avatarUrl != null ? NetworkImage(avatarUrl!) : null,
-            child: avatarUrl == null
-                ? Text(initial, style: const TextStyle(fontSize: 28))
-                : null,
+          // Avatar với viền vàng
+          Container(
+            padding: const EdgeInsets.all(2.5),
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [Color(0xFFF4B400), Color(0xFFFF9000)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: CircleAvatar(
+              radius: 36,
+              backgroundImage:
+                  avatarUrl != null ? NetworkImage(avatarUrl!) : null,
+              backgroundColor: _iconBg,
+              child: avatarUrl == null
+                  ? Text(
+                      initial,
+                      style: const TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                        color: _txtMain,
+                      ),
+                    )
+                  : null,
+            ),
           ),
           const SizedBox(width: 16),
 
-          // Tên + username (+ điểm cùng dòng) + badges
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Tên hiển thị
                 Text(
-                  nickname.isNotEmpty ? nickname : username,
+                  displayName,
                   style: const TextStyle(
-                      fontSize: 20, fontWeight: FontWeight.bold),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: _txtMain,
+                  ),
                 ),
                 const SizedBox(height: 4),
 
-                // @username + điểm đánh giá cùng dòng
                 Row(
                   children: [
                     Text(
                       '@$username',
-                      style: const TextStyle(color: Colors.grey, fontSize: 13),
+                      style: const TextStyle(color: _txtSub, fontSize: 13),
                     ),
                     ratingAsync.when(
                       loading: () => const SizedBox.shrink(),
@@ -302,19 +343,21 @@ class _ProfileHeader extends StatelessWidget {
                             children: [
                               const SizedBox(width: 8),
                               const Icon(Icons.star_rounded,
-                                  size: 13, color: Colors.amber),
+                                  size: 13, color: _accent),
                               const SizedBox(width: 2),
                               Text(
                                 summary.avg.toStringAsFixed(1),
                                 style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: _txtMain,
+                                ),
                               ),
                               const SizedBox(width: 2),
                               Text(
                                 '(${summary.count})',
                                 style: const TextStyle(
-                                    fontSize: 11, color: Colors.grey),
+                                    fontSize: 11, color: _txtSub),
                               ),
                             ],
                           ),
@@ -324,9 +367,8 @@ class _ProfileHeader extends StatelessWidget {
                   ],
                 ),
 
-                // Badges admin/mod
                 if (visibleRoles.isNotEmpty) ...[
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Wrap(
                     spacing: 4,
                     children: visibleRoles
@@ -334,11 +376,10 @@ class _ProfileHeader extends StatelessWidget {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
-                                color: _roleColor(r).withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(12),
+                                color: _roleColor(r).withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                    color:
-                                        _roleColor(r).withValues(alpha: 0.4)),
+                                    color: _roleColor(r).withValues(alpha: 0.35)),
                               ),
                               child: Text(
                                 _roleLabel(r),
@@ -360,29 +401,23 @@ class _ProfileHeader extends StatelessWidget {
     );
   }
 
-  static Color _roleColor(String role) {
-    return switch (role) {
-      'admin' => Colors.red,
-      'mod' => Colors.purple,
-      _ => Colors.blue,
-    };
-  }
+  static Color _roleColor(String role) => switch (role) {
+        'admin' => Colors.red,
+        'mod'   => Colors.purple,
+        _       => Colors.blue,
+      };
 
-  static String _roleLabel(String role) {
-    return switch (role) {
-      'admin' => 'Admin',
-      'mod' => 'Mod',
-      _ => role,
-    };
-  }
+  static String _roleLabel(String role) => switch (role) {
+        'admin' => 'Admin',
+        'mod'   => 'Mod',
+        _       => role,
+      };
 }
 
-// ---------------------------------------------------------------------------
-// Address Section (địa chỉ mặc định)
-// ---------------------------------------------------------------------------
+// ── Address Tile ──────────────────────────────────────────────────────────────
 
-class _AddressSection extends ConsumerWidget {
-  const _AddressSection();
+class _AddressTile extends ConsumerWidget {
+  const _AddressTile();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -400,25 +435,188 @@ class _AddressSection extends ConsumerWidget {
       },
     );
 
-    return ListTile(
-      leading: Icon(Icons.location_on_outlined,
-          color: Theme.of(context).colorScheme.onSurfaceVariant),
-      title: const Text('Địa chỉ của tôi'),
-      subtitle: Text(
-        subtitle,
-        style: const TextStyle(fontSize: 12),
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+    return _MenuTile(
+      icon: Icons.location_on_outlined,
+      label: 'Địa chỉ của tôi',
+      subtitle: subtitle,
       onTap: () => GoRouter.of(context).push('/profile/addresses'),
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-// Explore Sheet (Khám phá)
-// ---------------------------------------------------------------------------
+// ── Section label ─────────────────────────────────────────────────────────────
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 16, 6),
+        child: Text(
+          text.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFFA07830),
+            letterSpacing: 1.0,
+          ),
+        ),
+      );
+}
+
+// ── Menu Card (white rounded card grouping items) ─────────────────────────────
+
+class _MenuCard extends StatelessWidget {
+  final List<Widget> children;
+  const _MenuCard({required this.children});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: _card,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Column(children: children),
+        ),
+      );
+}
+
+// ── Menu Divider ──────────────────────────────────────────────────────────────
+
+class _MenuDivider extends StatelessWidget {
+  const _MenuDivider();
+
+  @override
+  Widget build(BuildContext context) => const Divider(
+        height: 1,
+        thickness: 0.5,
+        indent: 60,
+        color: _divider,
+      );
+}
+
+// ── Menu Tile ─────────────────────────────────────────────────────────────────
+
+class _MenuTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String? subtitle;
+  final VoidCallback onTap;
+
+  const _MenuTile({
+    required this.icon,
+    required this.label,
+    this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _iconBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 20, color: const Color(0xFF6B5230)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: _txtMain,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 1),
+                      Text(
+                        subtitle!,
+                        style: const TextStyle(fontSize: 12, color: _txtSub),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right,
+                  color: Color(0xFFBDB6A8), size: 20),
+            ],
+          ),
+        ),
+      );
+}
+
+// ── Logout Card ───────────────────────────────────────────────────────────────
+
+class _LogoutCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _LogoutCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: BoxDecoration(
+          color: _card,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            onTap: onTap,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 15),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.logout, color: Colors.red, size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'Đăng xuất',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+// ── Explore Sheet ─────────────────────────────────────────────────────────────
 
 class _ExploreSheet extends StatelessWidget {
   final BuildContext parentContext;
@@ -431,7 +629,6 @@ class _ExploreSheet extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Handle bar
           Container(
             width: 36,
             height: 4,
@@ -447,8 +644,7 @@ class _ExploreSheet extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: Text(
                 'Khám phá',
-                style:
-                    TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
           ),
@@ -515,9 +711,7 @@ class _ExploreItem extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// My Rating Screen (inline — hiển thị reviews nhận từ quán)
-// ---------------------------------------------------------------------------
+// ── My Rating Screen ──────────────────────────────────────────────────────────
 
 class MyRatingScreen extends ConsumerWidget {
   const MyRatingScreen({super.key});
@@ -548,7 +742,9 @@ class MyRatingScreen extends ConsumerWidget {
             );
           }
 
-          final avg = data.map((r) => r['stars'] as int).reduce((a, b) => a + b) /
+          final avg = data
+                  .map((r) => r['stars'] as int)
+                  .reduce((a, b) => a + b) /
               data.length;
 
           return Column(
@@ -618,10 +814,10 @@ class _RatingTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final store = review['fromUserId'] as Map<String, dynamic>?;
+    final store     = review['fromUserId'] as Map<String, dynamic>?;
     final storeName = store?['nickname'] as String? ?? 'Quán';
-    final stars = (review['stars'] as num?)?.toInt() ?? 0;
-    final comment = review['comment'] as String? ?? '';
+    final stars     = (review['stars'] as num?)?.toInt() ?? 0;
+    final comment   = review['comment'] as String? ?? '';
     final dt =
         DateTime.tryParse(review['createdAt'] as String? ?? '') ?? DateTime.now();
 
@@ -663,53 +859,4 @@ class _RatingTile extends StatelessWidget {
       isThreeLine: comment.isNotEmpty,
     );
   }
-}
-
-// ---------------------------------------------------------------------------
-// Helper widgets
-// ---------------------------------------------------------------------------
-
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-        child: Text(
-          text,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: Theme.of(context).colorScheme.primary,
-            letterSpacing: 0.5,
-          ),
-        ),
-      );
-}
-
-class _MenuItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String? subtitle;
-  final VoidCallback onTap;
-
-  const _MenuItem({
-    required this.icon,
-    required this.label,
-    this.subtitle,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) => ListTile(
-        leading: Icon(icon,
-            color: Theme.of(context).colorScheme.onSurfaceVariant),
-        title: Text(label),
-        subtitle: subtitle != null
-            ? Text(subtitle!, style: const TextStyle(fontSize: 12))
-            : null,
-        trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-        onTap: onTap,
-      );
 }

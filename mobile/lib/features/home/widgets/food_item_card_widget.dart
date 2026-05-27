@@ -2,8 +2,12 @@
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/providers/liked_items_provider.dart';
 import '../../../core/services/image_service.dart';
+import '../../../features/auth/providers/auth_provider.dart';
 import '../models/food_item_card.dart';
 
 class FoodItemCardWidget extends StatelessWidget {
@@ -19,96 +23,121 @@ class FoodItemCardWidget extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFF8E1),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.07),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Hình món ăn floating 3D ──────────────────────────────────────
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-                child: Stack(
-                  children: [
-                    // Ảnh với bóng đổ vàng
-                    Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFFFB300)
-                                  .withValues(alpha: 0.38),
-                              blurRadius: 18,
-                              spreadRadius: 3,
-                              offset: const Offset(0, 7),
-                            ),
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.13),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Hình nổi 3D ──────────────────────────────────────────────────
+          Expanded(
+            child: Stack(
+              children: [
+                // Ảnh với bóng đổ 3D lên background
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFFB300).withValues(alpha: 0.14),
+                          blurRadius: 22,
+                          spreadRadius: 2,
+                          offset: const Offset(0, 10),
                         ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: _ItemImage(url: item.image),
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.18),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
                         ),
-                      ),
+                      ],
                     ),
-                    // Badge đặc trưng (chỉ hiển thị nếu có)
-                    if (feature != null)
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        child: _FeatureBadge(text: feature),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-
-            // ── Thông tin bên dưới ───────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Tên món
-                  Text(
-                    item.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1A1A1A),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: _ItemImage(url: item.image),
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  // 4 chỉ số trên 1 dòng
-                  _StatsLine(item: item),
-                  const SizedBox(height: 4),
-                  // Giá tiền
-                  _PriceLine(price: item.price, oldPrice: oldPriceVal),
-                ],
-              ),
+                ),
+                // Badge đặc trưng - góc trái bên dưới
+                if (feature != null)
+                  Positioned(
+                    bottom: 8,
+                    left: 8,
+                    child: _FeatureBadge(text: feature),
+                  ),
+                // Trái tim - góc phải bên trên
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: _HeartButton(itemId: item.id),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+
+          const SizedBox(height: 4),
+
+          // ── Thông tin ──────────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  item.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                ),
+                const SizedBox(height: 1),
+                _StatsLine(item: item),
+                const SizedBox(height: 2),
+                _PriceLine(price: item.price, oldPrice: oldPriceVal),
+              ],
+            ),
+          ),
+        ],
       ),
     );
+  }
+}
+
+// ── Trái tim like ────────────────────────────────────────────────────────────
+
+class _HeartButton extends ConsumerWidget {
+  final String itemId;
+  const _HeartButton({required this.itemId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final likedMap = ref.watch(likedItemsProvider);
+    final likeId = likedMap[itemId];
+    final isLiked = likeId != null && likeId.isNotEmpty;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _toggle(context, ref),
+      child: Icon(
+        isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+        color: isLiked
+            ? const Color(0xFFEF4444)
+            : Colors.white.withValues(alpha: 0.90),
+        size: 22,
+        shadows: const [
+          Shadow(color: Colors.black45, blurRadius: 6),
+        ],
+      ),
+    );
+  }
+
+  void _toggle(BuildContext context, WidgetRef ref) {
+    if (!ref.read(authProvider).isAuthenticated) {
+      GoRouter.of(context).push('/login');
+      return;
+    }
+    ref.read(likedItemsProvider.notifier).toggle(itemId);
   }
 }
 
@@ -221,7 +250,7 @@ class _PriceLine extends StatelessWidget {
           style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w800,
-            color: Color(0xFFD32F2F),
+            color: Color(0xFF1A1A1A),
           ),
         ),
         if (oldPrice != null && oldPrice! > price) ...[
