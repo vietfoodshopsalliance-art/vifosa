@@ -4,7 +4,7 @@ import { LANDING } from '@/lib/landing-content'
 
 export const metadata: Metadata = {
   title: 'Viet Shops — Viet Food Shops Alliance',
-  description: LANDING.description !== 'ĐIỀN SAU' ? LANDING.description : 'Nền tảng kết nối quán ăn Việt Nam với thực khách.',
+  description: LANDING.description !== 'ĐIỀN SAU' ? LANDING.description : 'Nền tảng kết nối đồ ăn Việt Nam với thực khách.',
 }
 
 export default function LandingPage() {
@@ -25,18 +25,18 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section className="mx-auto max-w-5xl px-4 py-20 text-center">
-        <h1 className="mb-4 text-4xl font-bold leading-tight sm:text-5xl">
+        <h1 className="mb-4 text-4xl font-bold leading-tight sm:text-4xl">
           {LANDING.tagline !== 'ĐIỀN SAU' ? LANDING.tagline : (
             <>
-              Đặt đồ ăn từ quán yêu thích —<br />
-              <span className="text-[#1D7A4E]">không qua trung gian</span>
+              Đặt đồ ăn từ quán yêu thích<br />
+              <span className="text-[#1D7A4E]">Chiết khấu quán 0% - Khách tải app free</span>
             </>
           )}
         </h1>
         <p className="mx-auto mb-8 max-w-xl text-lg text-[#6B5C3E]">
           {LANDING.description !== 'ĐIỀN SAU'
             ? LANDING.description
-            : 'Viet Shops kết nối trực tiếp thực khách với các quán ăn địa phương. Không phí nền tảng, không trung gian, quán tự quản lý.'}
+            : 'Viet Shops kết nối trực tiếp thực khách với các quán ăn tại TP.HCM. Phương châm: Giá rẻ cho mọi người, giảm chi phí cho Quán.'}
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           <a
@@ -65,9 +65,9 @@ export default function LandingPage() {
                 ))
               : (
                 <>
-                  <FeatureCard icon="🍜" title="Đặt đồ ăn dễ dàng" description="Chọn quán, chọn món, theo dõi đơn real-time ngay trên app." />
-                  <FeatureCard icon="🏪" title="Quán tự quản lý" description="Chủ quán toàn quyền quản lý menu, giá, giờ mở cửa — không cần qua ai." />
-                  <FeatureCard icon="💸" title="Không phí nền tảng MVP" description="Giai đoạn đầu không thu phí nền tảng. Phí chỉ áp dụng khi có thỏa thuận rõ ràng." />
+                  <FeatureCard icon="🍜" title="Đặt đồ ăn dễ dàng" description="Đa dạng cửa hàng tại TPHCM - Kiểm tra, đánh giá chất lượng Cửa hàng, món ăn." />
+                  <FeatureCard icon="🏪" title="Quán tự quản lý" description="Chủ quán toàn quyền quản lý menu, giá cả, đóng mở cửa - không cần phê duyệt - xuất báo cáo excel" />
+                  <FeatureCard icon="💸" title="Không phí chiết khấu 0%" description="Phí chiết khấu 0% đối với 1.000 đơn hàng mỗi tháng/shop. Ủng hộ team Viet Shops duy trì phần mềm miễn phí nếu sẵn lòng." />
                 </>
               )
             }
@@ -81,7 +81,7 @@ export default function LandingPage() {
           <h2 className="mb-10 text-2xl font-bold">Cách hoạt động</h2>
           <div className="grid gap-8 sm:grid-cols-3">
             {[
-              { step: '1', icon: '📱', title: 'Tải app', desc: 'Tải Viet Shops trên Android, tạo tài khoản miễn phí.' },
+              { step: '1', icon: '📱', title: 'Tải app', desc: 'Tải Viet Shops trên Android, tạo tài khoản miễn phí (app iPhone đang build)' },
               { step: '2', icon: '🔍', title: 'Tìm quán gần bạn', desc: 'App tự định vị, hiện các quán đang mở trong bán kính của bạn.' },
               { step: '3', icon: '🛵', title: 'Đặt & theo dõi', desc: 'Chọn món, xác nhận đơn, theo dõi trạng thái real-time.' },
             ].map(({ step, icon, title, desc }) => (
