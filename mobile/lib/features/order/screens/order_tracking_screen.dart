@@ -597,30 +597,33 @@ class _TrackingTab extends StatelessWidget {
                     _PaymentStatusChip(status: paymentStatus),
                     const SizedBox(height: 10),
 
-                    if (isStoreVip && !isPaid) ...[
-                      // ── Quán VIP: đối soát tự động qua Sepay ─────────────
-                      Row(
-                        children: [
-                          const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Color(0xFFF4B400),
+                    if (isStoreVip) ...[
+                      // ── Quán VIP ──────────────────────────────────────────
+                      if (!isPaid) ...[
+                        // Đang chờ Sepay xác nhận
+                        Row(
+                          children: [
+                            const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFFF4B400),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'Đang chờ Sepay xác nhận tự động...\nChuyển khoản đúng nội dung "$transferContent" để được xác nhận ngay.',
-                              style: const TextStyle(
-                                  fontSize: 13, color: Color(0xFF92700A)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Đang chờ Sepay xác nhận tự động...\nChuyển khoản đúng nội dung "$transferContent" để được xác nhận ngay.',
+                                style: const TextStyle(
+                                    fontSize: 13, color: Color(0xFF92700A)),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      // ── Upload biên lai tuỳ chọn (an toàn hơn) ───────────
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                      // ── Upload biên lai tuỳ chọn — hiển thị cả sau khi đã thanh toán
                       if (receiptUrl != null && receiptUrl.isNotEmpty) ...[
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8),
@@ -648,7 +651,7 @@ class _TrackingTab extends StatelessWidget {
                         isLoading: uploadingReceipt,
                         variant: ButtonVariant.outlined,
                       ),
-                    ] else if (!isStoreVip) ...[
+                    ] else ...[
                       // ── Quán không VIP: thủ công như cũ ──────────────────
                       if (receiptUrl != null && receiptUrl.isNotEmpty) ...[
                         ClipRRect(
