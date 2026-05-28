@@ -189,6 +189,13 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Chi tiết đơn hàng'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Làm mới',
+            onPressed: () => ref.invalidate(orderDetailProvider(widget.orderId)),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabCtrl,
           tabs: const [
@@ -574,6 +581,35 @@ class _TrackingTab extends StatelessWidget {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 10),
+                      // ── Upload biên lai tuỳ chọn (an toàn hơn) ───────────
+                      if (receiptUrl != null && receiptUrl.isNotEmpty) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: CachedNetworkImage(
+                            imageUrl: receiptUrl,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => const SizedBox(
+                              height: 120,
+                              child: Center(child: CircularProgressIndicator()),
+                            ),
+                            errorWidget: (_, __, ___) => const SizedBox(
+                              height: 80,
+                              child: Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      AppButton(
+                        label: receiptUrl != null && receiptUrl.isNotEmpty
+                            ? 'Upload lại biên lai (tuỳ chọn)'
+                            : 'Upload biên lai (tuỳ chọn)',
+                        onPressed: uploadingReceipt ? null : onUploadReceipt,
+                        isLoading: uploadingReceipt,
+                        variant: ButtonVariant.outlined,
+                      ),
                     ] else if (!isStoreVip) ...[
                       // ── Quán không VIP: thủ công như cũ ──────────────────
                       if (receiptUrl != null && receiptUrl.isNotEmpty) ...[
@@ -726,8 +762,9 @@ class _TrackingTab extends StatelessWidget {
 
   static bool _canConfirmReceived(
       String status, String paymentMethod, String paymentStatus) {
-    // Chỉ cho phép khi quán đã đánh dấu "đã giao" (delivered)
-    if (status != 'delivered') return false;
+    // Cho phép từ khi quán nhận đơn (preparing) trở đi
+    const allowedStatuses = ['preparing', 'delivering', 'delivered'];
+    if (!allowedStatuses.contains(status)) return false;
     switch (paymentMethod) {
       case 'cod':
         return true;
