@@ -36,6 +36,9 @@
             android:name="flutterEmbedding"
             android:value="2" />
         <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-6615086832239602~9143295797"/>
+        <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"
             android:value="false" />
     </application>

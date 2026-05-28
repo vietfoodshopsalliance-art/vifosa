@@ -54,6 +54,9 @@ dependencies:
   # Real-time order tracking — Socket.IO
   socket_io_client: ^2.0.3+1
 
+  # AdMob rewarded ads
+  google_mobile_ads: ^5.3.0
+
   cupertino_icons: ^1.0.6
 
 dev_dependencies:

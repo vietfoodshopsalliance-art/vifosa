@@ -44,7 +44,7 @@ function TrackForm() {
     <div className="flex min-h-screen items-center justify-center bg-[#FDFAF3] px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <Link href="/" className="text-3xl font-bold text-[#1D7A4E]">Vifosa</Link>
+          <Link href="/" className="text-3xl font-bold text-[#1D7A4E]">Viet Shops</Link>
           <p className="mt-2 text-sm text-[#6B5C3E]">Tra cứu đơn hàng</p>
         </div>
 

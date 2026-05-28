@@ -102,6 +102,7 @@ class ProfileScreen extends ConsumerWidget {
     final avatarUrl  = user['avatarImage'] as String? ?? user['avatar'] as String?;
     final nickname   = user['nickname'] as String? ?? '';
     final username   = user['username'] as String? ?? '';
+    final exp              = (user['exp'] as num?)?.toInt() ?? 0;
     final ratingAsync      = ref.watch(_myRatingProvider);
     final orderStatsAsync  = ref.watch(_myOrderStatsProvider);
     final reviewCountAsync = ref.watch(_myReviewCountProvider);
@@ -152,6 +153,7 @@ class ProfileScreen extends ConsumerWidget {
               nickname: nickname,
               username: username,
               roles: roles,
+              exp: exp,
               ratingAsync: ratingAsync,
               orderStatsAsync: orderStatsAsync,
               reviewCountAsync: reviewCountAsync,
@@ -291,6 +293,7 @@ class _ProfileHeaderCard extends StatelessWidget {
   final String nickname;
   final String username;
   final List<String> roles;
+  final int exp;
   final AsyncValue<_RatingSummary?> ratingAsync;
   final AsyncValue<_OrderStats> orderStatsAsync;
   final AsyncValue<int> reviewCountAsync;
@@ -301,6 +304,7 @@ class _ProfileHeaderCard extends StatelessWidget {
     required this.nickname,
     required this.username,
     required this.roles,
+    required this.exp,
     required this.ratingAsync,
     required this.orderStatsAsync,
     required this.reviewCountAsync,
@@ -449,6 +453,24 @@ class _ProfileHeaderCard extends StatelessWidget {
                           ),
                         ],
                       ),
+                  ],
+                ),
+
+                const SizedBox(height: 6),
+                // ── EXP badge ─────────────────────────────────────────────
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.military_tech, size: 14, color: _accent),
+                    const SizedBox(width: 3),
+                    Text(
+                      '$exp EXP',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF6B5230),
+                      ),
+                    ),
                   ],
                 ),
 

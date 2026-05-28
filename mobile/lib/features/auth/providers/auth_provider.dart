@@ -122,6 +122,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
+  Future<void> refreshUser() async {
+    try {
+      final user = await _repo.getMe();
+      state = state.copyWith(user: user);
+    } catch (_) {}
+  }
+
   Future<void> saveFcmToken(String token) async {
     try {
       await _repo.saveFcmToken(token);
