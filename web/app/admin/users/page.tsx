@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
 
+type VipTier = 'none' | 'vip' | 'vvip' | 'vvvip'
+
 interface User {
   _id: string
   username: string
@@ -11,6 +13,7 @@ interface User {
   roles: string[]
   isActive: boolean
   isSuspicious?: boolean
+  vipTier?: VipTier
   createdAt: string
 }
 
@@ -98,6 +101,15 @@ export default function AdminUsersPage() {
     } catch { setActionMsg('Có lỗi xảy ra.') }
   }
 
+  async function updateVipTier(user: User, tier: string) {
+    try {
+      await api.patch(`/admin/users/${user._id}/vip-tier`, { tier })
+      const label = tier === 'none' ? 'Thường' : tier.toUpperCase()
+      setActionMsg(`Đã cập nhật VIP cho "${user.username}": ${label}.`)
+      load()
+    } catch (e: any) { setActionMsg(e?.message ?? 'Có lỗi xảy ra.') }
+  }
+
   async function confirmDelete() {
     if (modal?.type !== 'delete') return
     try {
@@ -155,16 +167,17 @@ export default function AdminUsersPage() {
             <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-semibold text-[#6B5C3E] uppercase">
               <Th col="username" label="Người dùng" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} />
               <Th col="roles"    label="Vai trò"    sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} />
+              <th className="px-4 py-3">VIP</th>
               <Th col="status"   label="Trạng thái" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} />
               <th className="px-4 py-3">Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-[#6B5C3E]">Đang tải...</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-[#6B5C3E]">Đang tải...</td></tr>
             )}
             {!loading && sortedUsers.length === 0 && (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-[#6B5C3E]">Không tìm thấy user nào.</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-[#6B5C3E]">Không tìm thấy user nào.</td></tr>
             )}
             {sortedUsers.map((u) => (
               <tr key={u._id} className="border-b border-gray-50 hover:bg-gray-50">
@@ -183,6 +196,23 @@ export default function AdminUsersPage() {
                       }`}>{r}</span>
                     ))}
                   </div>
+                </td>
+                <td className="px-4 py-3">
+                  <select
+                    value={u.vipTier ?? 'none'}
+                    onChange={(e) => updateVipTier(u, e.target.value)}
+                    className={`rounded-lg border px-2 py-1 text-xs focus:outline-none ${
+                      u.vipTier === 'vip'   ? 'border-amber-300 bg-amber-50 text-amber-800 font-semibold' :
+                      u.vipTier === 'vvip'  ? 'border-gray-300 bg-gray-100 text-gray-700 font-semibold' :
+                      u.vipTier === 'vvvip' ? 'border-purple-300 bg-purple-50 text-purple-800 font-semibold' :
+                      'border-gray-200 text-gray-500'
+                    }`}
+                  >
+                    <option value="none">Thường</option>
+                    <option value="vip">VIP</option>
+                    <option value="vvip">VVIP</option>
+                    <option value="vvvip">VVVIP</option>
+                  </select>
                 </td>
                 <td className="px-4 py-3">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${

@@ -7,6 +7,7 @@ const NAV = [
   { href: '/store/reviews',  label: 'Đánh giá' },
   { href: '/store/reports',  label: 'Báo cáo' },
   { href: '/store/settings', label: 'Cài đặt' },
+  { href: '/store/vip',      label: '⭐ VIP' },
 ]
 
 // Auth is enforced by middleware.ts — no cookies() call here to avoid

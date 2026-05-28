@@ -103,6 +103,7 @@ class ProfileScreen extends ConsumerWidget {
     final nickname   = user['nickname'] as String? ?? '';
     final username   = user['username'] as String? ?? '';
     final exp              = (user['exp'] as num?)?.toInt() ?? 0;
+    final vipTier          = user['vipTier'] as String? ?? 'none';
     final ratingAsync      = ref.watch(_myRatingProvider);
     final orderStatsAsync  = ref.watch(_myOrderStatsProvider);
     final reviewCountAsync = ref.watch(_myReviewCountProvider);
@@ -138,6 +139,7 @@ class ProfileScreen extends ConsumerWidget {
           ref.invalidate(_myOrderStatsProvider);
           ref.invalidate(_myReviewCountProvider);
           await Future.wait([
+            ref.read(authProvider.notifier).refreshUser(),
             ref.read(_myRatingProvider.future),
             ref.read(_defaultAddressProvider.future),
             ref.read(_myOrderStatsProvider.future),
@@ -154,6 +156,7 @@ class ProfileScreen extends ConsumerWidget {
               username: username,
               roles: roles,
               exp: exp,
+              vipTier: vipTier,
               ratingAsync: ratingAsync,
               orderStatsAsync: orderStatsAsync,
               reviewCountAsync: reviewCountAsync,
@@ -294,6 +297,7 @@ class _ProfileHeaderCard extends StatelessWidget {
   final String username;
   final List<String> roles;
   final int exp;
+  final String vipTier;
   final AsyncValue<_RatingSummary?> ratingAsync;
   final AsyncValue<_OrderStats> orderStatsAsync;
   final AsyncValue<int> reviewCountAsync;
@@ -305,6 +309,7 @@ class _ProfileHeaderCard extends StatelessWidget {
     required this.username,
     required this.roles,
     required this.exp,
+    required this.vipTier,
     required this.ratingAsync,
     required this.orderStatsAsync,
     required this.reviewCountAsync,
@@ -378,13 +383,26 @@ class _ProfileHeaderCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  displayName,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: _txtMain,
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        displayName,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: _txtMain,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (vipTier != 'none') ...[
+                      const SizedBox(width: 6),
+                      _VipBadge(tier: vipTier),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 4),
 
@@ -519,6 +537,43 @@ class _ProfileHeaderCard extends StatelessWidget {
         'mod'   => 'Mod',
         _       => role,
       };
+}
+
+// ── VIP Badge ─────────────────────────────────────────────────────────────────
+
+class _VipBadge extends StatelessWidget {
+  final String tier;
+  const _VipBadge({required this.tier});
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, bg, fg) = switch (tier) {
+      'vip'   => ('VIP',   const Color(0xFFFFF3CD), const Color(0xFF92700A)),
+      'vvip'  => ('VVIP',  const Color(0xFFEEEEEE), const Color(0xFF444444)),
+      'vvvip' => ('VVVIP', const Color(0xFFF3E8FF), const Color(0xFF6B21A8)),
+      _       => ('', Colors.transparent, Colors.transparent),
+    };
+
+    if (label.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: fg.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: fg,
+          letterSpacing: 0.6,
+        ),
+      ),
+    );
+  }
 }
 
 // ── Address Tile ──────────────────────────────────────────────────────────────

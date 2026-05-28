@@ -7,9 +7,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/models/category.dart';
+import '../../../core/models/store.dart' show StoreStatus;
 import '../../../core/widgets/avatar_menu_button.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 import '../models/food_item_card.dart';
+import '../models/store_card.dart';
 import '../providers/home_feed_provider.dart';
 import '../widgets/food_item_card_widget.dart';
 
@@ -229,6 +232,40 @@ class _FoodItemsSection extends ConsumerWidget {
       );
     }
 
+    void navigateToItem(BuildContext ctx, FoodItemCard item) {
+      final stores = ref.read(nearbyStoresProvider).stores;
+      StoreCard? store;
+      try {
+        store = stores.firstWhere((s) => s.id == item.storeId);
+      } catch (_) {}
+
+      final storeName = store?.name ?? '';
+      StoreStatus storeStatus;
+      if (store == null) {
+        storeStatus = StoreStatus.open;
+      } else if (store.emergencyClosed) {
+        storeStatus = StoreStatus.emergencyClosed;
+      } else if (!store.isOpen) {
+        storeStatus = StoreStatus.preOrder;
+      } else {
+        storeStatus = StoreStatus.open;
+      }
+
+      ctx.push('/item-detail', extra: {
+        'item': CategoryItem(
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          price: item.price,
+          images: item.image != null ? [item.image!] : const [],
+          status: 'active',
+        ),
+        'storeId': item.storeId,
+        'storeName': storeName,
+        'storeStatus': storeStatus,
+      });
+    }
+
     return SliverMainAxisGroup(
       slivers: [
         // Header
@@ -273,7 +310,7 @@ class _FoodItemsSection extends ConsumerWidget {
               childAspectRatio: 0.72,
             ),
             delegate: SliverChildBuilderDelegate(
-              (ctx, i) => _buildSlotWidget(ctx, slots[i]),
+              (ctx, i) => _buildSlotWidget(ctx, slots[i], navigateToItem),
               childCount: slots.length,
             ),
           ),
@@ -331,14 +368,16 @@ class _FoodItemsSection extends ConsumerWidget {
     return slots;
   }
 
-  Widget _buildSlotWidget(BuildContext ctx, _GridSlot slot) {
+  Widget _buildSlotWidget(BuildContext ctx, _GridSlot slot,
+      void Function(BuildContext, FoodItemCard) onItemTap) {
     if (slot is _SlideshowSlot) {
-      return _SlideshowCard(key: slot.key, items: slot.items);
+      return _SlideshowCard(
+          key: slot.key, items: slot.items, onItemTap: onItemTap);
     }
     final item = (slot as _StaticSlot).item;
     return FoodItemCardWidget(
       item: item,
-      onTap: () => ctx.push('/store/${item.storeId}'),
+      onTap: () => onItemTap(ctx, item),
     );
   }
 }
@@ -362,7 +401,9 @@ class _SlideshowSlot extends _GridSlot {
 
 class _SlideshowCard extends StatefulWidget {
   final List<FoodItemCard> items;
-  const _SlideshowCard({super.key, required this.items});
+  final void Function(BuildContext, FoodItemCard) onItemTap;
+  const _SlideshowCard(
+      {super.key, required this.items, required this.onItemTap});
 
   @override
   State<_SlideshowCard> createState() => _SlideshowCardState();
@@ -423,7 +464,7 @@ class _SlideshowCardState extends State<_SlideshowCard> {
         child: FoodItemCardWidget(
           key: ValueKey(_idx),
           item: item,
-          onTap: () => context.push('/store/${item.storeId}'),
+          onTap: () => widget.onItemTap(context, item),
         ),
       ),
     );

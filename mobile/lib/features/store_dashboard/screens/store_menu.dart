@@ -45,7 +45,7 @@ class MenuItemModel {
   final String name;
   final String? description;
   final double price;
-  final String? imageUrl;
+  final List<String> images;
   final bool isAvailable; // status == 'active'
   final String status;    // 'active' | 'closed' | 'paused'
   final String categoryId;
@@ -56,12 +56,14 @@ class MenuItemModel {
     required this.name,
     this.description,
     required this.price,
-    this.imageUrl,
+    this.images = const [],
     required this.isAvailable,
     required this.status,
     required this.categoryId,
     this.stock,
   });
+
+  String? get imageUrl => images.isNotEmpty ? images.first : null;
 
   factory MenuItemModel.fromJson(Map<String, dynamic> j) {
     final images = (j['images'] as List?)?.cast<String>() ?? [];
@@ -71,7 +73,7 @@ class MenuItemModel {
       name: j['name'] as String? ?? '',
       description: j['description'] as String?,
       price: (j['price'] as num? ?? 0).toDouble(),
-      imageUrl: images.isNotEmpty ? images.first : null,
+      images: images,
       isAvailable: status == 'active',
       status: status,
       categoryId: (j['categoryId'] ?? '').toString(),
@@ -889,10 +891,17 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
   final _descCtrl = TextEditingController();
   final _stockCtrl = TextEditingController();
   String? _selectedCategoryId;
-  XFile? _imageFile;
-  String? _existingImageUrl;
+
+  // Ảnh hiện có trên server (URL)
+  List<String> _existingImages = [];
+  // Ảnh mới chọn từ máy (chưa upload)
+  List<XFile> _newImageFiles = [];
+
   bool _trackStock = false;
   bool _saving = false;
+
+  static const int _maxImages = 5;
+  int get _totalImages => _existingImages.length + _newImageFiles.length;
 
   @override
   void initState() {
@@ -903,7 +912,7 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
       _priceCtrl.text = e.price.toStringAsFixed(0);
       _descCtrl.text = e.description ?? '';
       _selectedCategoryId = e.categoryId;
-      _existingImageUrl = e.imageUrl;
+      _existingImages = List<String>.from(e.images);
       _trackStock = e.stock != null;
       _stockCtrl.text = e.stock?.toString() ?? '0';
     } else {
@@ -921,10 +930,12 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
-    final file = await ImageService.instance.pickSingle();
-    if (file == null) return;
-    setState(() => _imageFile = file);
+  Future<void> _pickImages() async {
+    final remaining = _maxImages - _totalImages;
+    if (remaining <= 0) return;
+    final files = await ImageService.instance.pickMultiple(limit: remaining);
+    if (files.isEmpty) return;
+    setState(() => _newImageFiles.addAll(files));
   }
 
   Future<void> _save() async {
@@ -933,21 +944,24 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
     }
     setState(() => _saving = true);
     try {
-      String? newImageUrl;
-      if (_imageFile != null) {
-        final uploaded = await ImageService.instance.uploadXFile(
-          _imageFile!,
+      // Upload tất cả ảnh mới song song
+      List<String> newUrls = [];
+      if (_newImageFiles.isNotEmpty) {
+        final uploaded = await ImageService.instance.uploadMultiple(
+          _newImageFiles,
           context: ImageUploadContext.menuItem,
         );
-        newImageUrl = uploaded.url;
+        newUrls = uploaded.map((u) => u.url).toList();
       }
+
+      final allImages = [..._existingImages, ...newUrls];
 
       final data = <String, dynamic>{
         'name': _nameCtrl.text.trim(),
         'price': double.tryParse(_priceCtrl.text.trim()) ?? 0,
         'description': _descCtrl.text.trim(),
         'categoryId': _selectedCategoryId,
-        if (newImageUrl != null) 'images': [newImageUrl],
+        'images': allImages,
         'stock': _trackStock
             ? (int.tryParse(_stockCtrl.text.trim()) ?? 0)
             : null,
@@ -955,8 +969,7 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
 
       if (widget.existing != null) {
         await DioClient.instance.patch(
-          ApiEndpoints.storeItemById(
-              widget.storeId, widget.existing!.id),
+          ApiEndpoints.storeItemById(widget.storeId, widget.existing!.id),
           data: data,
         );
       } else {
@@ -974,6 +987,68 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
     }
   }
 
+  // Một ô ảnh trong grid (có nút X để xóa)
+  Widget _imageSlot({required Widget child, required VoidCallback onRemove}) {
+    return Container(
+      width: 90,
+      height: 90,
+      margin: const EdgeInsets.only(right: 8),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: child,
+          ),
+          Positioned(
+            top: 3,
+            right: 3,
+            child: GestureDetector(
+              onTap: onRemove,
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 13),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Ô "thêm ảnh" (nét đứt)
+  Widget _addSlot() {
+    return GestureDetector(
+      onTap: _pickImages,
+      child: Container(
+        width: 90,
+        height: 90,
+        margin: const EdgeInsets.only(right: 8),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add_photo_alternate_outlined,
+                size: 26, color: Colors.grey.shade400),
+            const SizedBox(height: 4),
+            Text(
+              'Thêm ảnh',
+              style: TextStyle(fontSize: 10, color: Colors.grey.shade400),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
@@ -981,7 +1056,10 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
 
     return Padding(
       padding: EdgeInsets.only(
-          left: 20, right: 20, top: 20, bottom: 20 + bottomInset + systemBottomPadding),
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: 20 + bottomInset + systemBottomPadding),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -989,50 +1067,65 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
           children: [
             Text(
               widget.existing != null ? 'Sửa món' : 'Thêm món mới',
-              style:
-                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              style: const TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 16),
 
-            // Image picker
-            GestureDetector(
-              onTap: _pickImage,
-              child: Container(
-                height: 120,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.shade300),
+            // ── Ảnh món (multi-image) ──────────────────────────────────────
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Ảnh món',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 14)),
+                Text(
+                  '$_totalImages/$_maxImages',
+                  style: TextStyle(
+                      color: Colors.grey.shade500, fontSize: 12),
                 ),
-                child: _imageFile != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Image.file(File(_imageFile!.path),
-                            fit: BoxFit.cover),
-                      )
-                    : _existingImageUrl != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: CachedNetworkImage(
-                              imageUrl: _existingImageUrl!,
-                              fit: BoxFit.cover,
-                            ),
-                          )
-                        : const Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.add_photo_alternate_outlined,
-                                  size: 32, color: Colors.grey),
-                              SizedBox(height: 6),
-                              Text('Thêm ảnh món',
-                                  style: TextStyle(color: Colors.grey)),
-                            ],
-                          ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 90,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  // Ảnh hiện có từ server
+                  for (int i = 0; i < _existingImages.length; i++)
+                    _imageSlot(
+                      child: CachedNetworkImage(
+                        imageUrl: ImageService.thumbnail(
+                            _existingImages[i],
+                            size: 200),
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => Container(
+                          color: Colors.grey.shade200,
+                          child: const Icon(Icons.broken_image,
+                              color: Colors.grey),
+                        ),
+                      ),
+                      onRemove: () =>
+                          setState(() => _existingImages.removeAt(i)),
+                    ),
+                  // Ảnh mới chọn từ máy (chưa upload)
+                  for (int i = 0; i < _newImageFiles.length; i++)
+                    _imageSlot(
+                      child: Image.file(
+                          File(_newImageFiles[i].path),
+                          fit: BoxFit.cover),
+                      onRemove: () =>
+                          setState(() => _newImageFiles.removeAt(i)),
+                    ),
+                  // Nút thêm ảnh
+                  if (_totalImages < _maxImages) _addSlot(),
+                ],
               ),
             ),
             const SizedBox(height: 14),
 
+            // ── Tên, giá, mô tả ───────────────────────────────────────────
             TextField(
               controller: _nameCtrl,
               decoration: const InputDecoration(
@@ -1099,6 +1192,29 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
               ),
               const SizedBox(height: 12),
             ],
+
+            // Chú thích khi đang upload
+            if (_saving && _newImageFiles.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.grey.shade400),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Đang upload ${_newImageFiles.length} ảnh...',
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.grey.shade500),
+                    ),
+                  ],
+                ),
+              ),
 
             const SizedBox(height: 8),
             SizedBox(

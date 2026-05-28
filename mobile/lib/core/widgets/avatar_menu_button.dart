@@ -91,7 +91,7 @@ class AvatarMenuButton extends ConsumerWidget {
       BuildContext context, WidgetRef ref, AvatarMenuOption option) {
     switch (option) {
       case AvatarMenuOption.profile:
-        context.push('/profile');
+        context.go('/profile');
       case AvatarMenuOption.storeDashboard:
         context.push('/my-stores');
       case AvatarMenuOption.logout:
