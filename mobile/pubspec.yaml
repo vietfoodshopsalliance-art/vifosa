@@ -1,7 +1,7 @@
 name: vifosa
 description: Viet Food Shops Alliance — đặt đồ ăn TPHCM
 publish_to: 'none'
-version: 1.0.8+9
+version: 1.0.9+10
 
 # Spec BR-5: Flutter package name = vifosa
 # Spec TO-1: Flutter 3.x + Dart

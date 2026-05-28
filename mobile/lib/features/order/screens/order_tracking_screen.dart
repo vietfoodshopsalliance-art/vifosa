@@ -1050,7 +1050,7 @@ class _PaymentStatusChip extends StatelessWidget {
       case 'paid_full':
       case 'cod_collected':
         color = const Color(0xFF4CAF50);
-        label = 'Đã thanh toán';
+        label = 'Đã nhận tiền';
         break;
       case 'reported_paid':
         color = const Color(0xFF2196F3);
