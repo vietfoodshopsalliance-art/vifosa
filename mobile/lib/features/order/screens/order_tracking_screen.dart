@@ -275,6 +275,13 @@ class _TrackingTab extends StatelessWidget {
     final isPaid =
         paymentStatus == 'paid_full' || paymentStatus == 'cod_collected';
 
+    // Quán VIP → đối soát tự động qua Sepay (nếu hết VIP thì trở lại thủ công)
+    final storeVipTier = storeDetails?['vipTier'] as String? ?? 'none';
+    final isStoreVip = storeVipTier != 'none';
+    // Nội dung CK: VIP thêm prefix SEVQR, non-VIP giữ nguyên order code
+    final orderCode = order['code'] as String? ?? '';
+    final transferContent = isStoreVip ? 'SEVQR $orderCode' : orderCode;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -442,7 +449,7 @@ class _TrackingTab extends StatelessWidget {
                       accountNo: bank['number'] as String? ?? '',
                       accountName: bank['holder'] as String? ?? '',
                       amount: totalAmount.toInt(),
-                      description: order['code'] as String? ?? '',
+                      description: transferContent,
                     ),
                     const SizedBox(height: 10),
                     _infoRow(Icons.account_balance_outlined,
@@ -450,36 +457,79 @@ class _TrackingTab extends StatelessWidget {
                     _infoRow(Icons.person_outlined,
                         bank['holder'] as String? ?? ''),
                     const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.info_outline,
-                            size: 16, color: Colors.blue),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Nội dung CK: ${order['code'] ?? ''}',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue,
-                                fontSize: 13),
+                    if (isStoreVip)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF3CD),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFFD700)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.bolt,
+                                size: 15, color: Color(0xFF92700A)),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                'Nội dung CK: $transferContent',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF92700A),
+                                    fontSize: 13),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.copy, size: 16),
+                              tooltip: 'Sao chép',
+                              onPressed: () {
+                                Clipboard.setData(
+                                    ClipboardData(text: transferContent));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content:
+                                          Text('Đã sao chép nội dung CK')),
+                                );
+                              },
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Row(
+                        children: [
+                          const Icon(Icons.info_outline,
+                              size: 16, color: Colors.blue),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Nội dung CK: $transferContent',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue,
+                                  fontSize: 13),
+                            ),
                           ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.copy, size: 16),
-                          tooltip: 'Sao chép',
-                          onPressed: () {
-                            Clipboard.setData(ClipboardData(
-                                text: order['code'] as String? ?? ''));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Đã sao chép nội dung')),
-                            );
-                          },
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                      ],
-                    ),
+                          IconButton(
+                            icon: const Icon(Icons.copy, size: 16),
+                            tooltip: 'Sao chép',
+                            onPressed: () {
+                              Clipboard.setData(
+                                  ClipboardData(text: transferContent));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content:
+                                        Text('Đã sao chép nội dung')),
+                              );
+                            },
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -487,7 +537,7 @@ class _TrackingTab extends StatelessWidget {
             const SizedBox(height: 12),
           ],
 
-          // ── Biên lai chuyển khoản ─────────────────────────────────────────
+          // ── Thanh toán / Biên lai ─────────────────────────────────────────
           if (isBank && !isCancelled) ...[
             Card(
               child: Padding(
@@ -495,53 +545,78 @@ class _TrackingTab extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Biên lai chuyển khoản',
+                    const Text('Thanh toán',
                         style: TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 15)),
                     const SizedBox(height: 8),
                     _PaymentStatusChip(status: paymentStatus),
                     const SizedBox(height: 10),
-                    // Hiện ảnh biên lai nếu đã upload
-                    if (receiptUrl != null && receiptUrl.isNotEmpty) ...[
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: CachedNetworkImage(
-                          imageUrl: receiptUrl,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => const SizedBox(
-                            height: 120,
-                            child: Center(
-                                child: CircularProgressIndicator()),
+
+                    if (isStoreVip && !isPaid) ...[
+                      // ── Quán VIP: đối soát tự động qua Sepay ─────────────
+                      Row(
+                        children: [
+                          const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFFF4B400),
+                            ),
                           ),
-                          errorWidget: (_, __, ___) => const SizedBox(
-                            height: 80,
-                            child: Center(
-                                child: Icon(Icons.broken_image,
-                                    color: Colors.grey)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Đang chờ Sepay xác nhận tự động...\nChuyển khoản đúng nội dung "$transferContent" để được xác nhận ngay.',
+                              style: const TextStyle(
+                                  fontSize: 13, color: Color(0xFF92700A)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else if (!isStoreVip) ...[
+                      // ── Quán không VIP: thủ công như cũ ──────────────────
+                      if (receiptUrl != null && receiptUrl.isNotEmpty) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: CachedNetworkImage(
+                            imageUrl: receiptUrl,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => const SizedBox(
+                              height: 120,
+                              child:
+                                  Center(child: CircularProgressIndicator()),
+                            ),
+                            errorWidget: (_, __, ___) => const SizedBox(
+                              height: 80,
+                              child: Center(
+                                  child: Icon(Icons.broken_image,
+                                      color: Colors.grey)),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                    // Nút upload (chỉ khi chưa paid)
-                    if (!isPaid)
-                      AppButton(
-                        label: receiptUrl != null && receiptUrl.isNotEmpty
-                            ? 'Upload lại biên lai'
-                            : 'Upload biên lai',
-                        onPressed: uploadingReceipt ? null : onUploadReceipt,
-                        isLoading: uploadingReceipt,
-                        variant: ButtonVariant.outlined,
-                      ),
-                    if (paymentStatus == 'unpaid') ...[
-                      const SizedBox(height: 8),
-                      AppButton(
-                        label: 'Xác nhận đã chuyển khoản',
-                        onPressed: loadingAction ? null : onConfirmPayment,
-                        isLoading: loadingAction,
-                        variant: ButtonVariant.primary,
-                      ),
+                        const SizedBox(height: 8),
+                      ],
+                      if (!isPaid)
+                        AppButton(
+                          label: receiptUrl != null && receiptUrl.isNotEmpty
+                              ? 'Upload lại biên lai'
+                              : 'Upload biên lai',
+                          onPressed:
+                              uploadingReceipt ? null : onUploadReceipt,
+                          isLoading: uploadingReceipt,
+                          variant: ButtonVariant.outlined,
+                        ),
+                      if (paymentStatus == 'unpaid') ...[
+                        const SizedBox(height: 8),
+                        AppButton(
+                          label: 'Xác nhận đã chuyển khoản',
+                          onPressed: loadingAction ? null : onConfirmPayment,
+                          isLoading: loadingAction,
+                          variant: ButtonVariant.primary,
+                        ),
+                      ],
                     ],
                   ],
                 ),
