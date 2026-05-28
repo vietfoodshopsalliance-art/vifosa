@@ -206,10 +206,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, state) {
           final extra = state.extra as Map<String, dynamic>;
           return _light(GuestOrderSuccessScreen(
+            orderId:          extra['orderId'] as String? ?? '',
             code:             extra['code'] as String,
             token:            extra['token'] as String,
             storeName:        extra['storeName'] as String,
             storeBankAccount: extra['storeBankAccount'] as Map<String, dynamic>?,
+            storeVipTier:     extra['storeVipTier'] as String? ?? 'none',
             totalAmount:      (extra['totalAmount'] as num).toInt(),
           ));
         },

@@ -614,7 +614,7 @@ class _TrackingTab extends StatelessWidget {
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                'Đang chờ Sepay xác nhận tự động...\nChuyển khoản đúng nội dung "$transferContent" để được xác nhận ngay.',
+                                'Đang chờ tiền vào tài khoản...\nChuyển khoản đúng nội dung "$transferContent" để được xác nhận ngay.',
                                 style: const TextStyle(
                                     fontSize: 13, color: Color(0xFF92700A)),
                               ),

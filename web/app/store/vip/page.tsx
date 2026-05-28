@@ -224,7 +224,7 @@ export default function StoreVipPage() {
       <div className="mb-6">
         <h1 className="text-xl font-bold text-[#1A1200]">Đăng ký VIP quán</h1>
         <p className="mt-1 text-sm text-[#6B5C3E]">
-          Nâng cấp VIP để được ưu tiên hiển thị và mở khóa tính năng cao cấp. Thanh toán tự động qua Sepay.
+          Nâng cấp VIP để được ưu tiên hiển thị và mở khóa tính năng cao cấp. Kiểm tra thanh toán tự động.
         </p>
       </div>
 

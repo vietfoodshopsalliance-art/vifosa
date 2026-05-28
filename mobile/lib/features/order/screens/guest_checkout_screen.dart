@@ -263,10 +263,12 @@ class _GuestCheckoutScreenState extends State<GuestCheckoutScreen> {
 
       if (mounted) {
         context.pushReplacement('/guest-order-success', extra: {
+          'orderId':          orderData['_id']?.toString() ?? '',
           'code':             orderData['code'] as String,
           'token':            orderData['trackingToken'] as String,
           'storeName':        orderData['storeName'] as String,
           'storeBankAccount': orderData['storeBankSnapshot'] as Map<String, dynamic>?,
+          'storeVipTier':     orderData['storeVipTier'] as String? ?? 'none',
           'totalAmount':      (orderData['totalAmount'] as num).toInt(),
         });
       }

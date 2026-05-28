@@ -17,7 +17,7 @@ export default function StoreLayout({ children }: { children: React.ReactNode })
     <div className="flex min-h-screen bg-[#FDFAF3]">
       <aside className="hidden w-52 flex-shrink-0 flex-col border-r border-gray-200 bg-white lg:flex">
         <div className="flex h-14 items-center border-b border-gray-100 px-4">
-          <span className="text-lg font-bold text-[#1D7A4E]">Vifosa</span>
+          <span className="text-lg font-bold text-[#1D7A4E]">Viet Shops</span>
           <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">Quán</span>
         </div>
 
