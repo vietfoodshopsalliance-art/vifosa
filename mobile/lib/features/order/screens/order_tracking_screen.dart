@@ -1,5 +1,6 @@
 // lib/features/order/screens/order_tracking_screen.dart
 
+import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -40,6 +41,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
   late TabController _tabCtrl;
   bool _loadingAction = false;
   bool _uploadingReceipt = false;
+  Timer? _pollTimer;
 
   @override
   void initState() {
@@ -51,6 +53,8 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
   void _subscribeSocket() {
     final sc = SocketClient();
     sc.joinOrderRoom(widget.orderId);
+    // Re-join room sau khi socket reconnect (app ở background rồi quay lại)
+    sc.on('connect', (_) => sc.joinOrderRoom(widget.orderId));
     sc.onOrderStatusChanged((data) {
       if (data['orderId'] == widget.orderId && mounted) {
         ref.invalidate(orderDetailProvider(widget.orderId));
@@ -63,10 +67,25 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
     });
   }
 
+  // Polling fallback cho quán VIP chờ Sepay xác nhận — phòng khi socket miss event
+  void _startPolling() {
+    if (_pollTimer?.isActive ?? false) return;
+    _pollTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (mounted) ref.invalidate(orderDetailProvider(widget.orderId));
+    });
+  }
+
+  void _stopPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
   @override
   void dispose() {
+    _stopPolling();
     final sc = SocketClient();
     sc.leaveOrderRoom(widget.orderId);
+    sc.off('connect');
     sc.off('order_status_changed');
     sc.off('payment_status_changed');
     _tabCtrl.dispose();
@@ -185,6 +204,25 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
   @override
   Widget build(BuildContext context) {
     final orderAsync = ref.watch(orderDetailProvider(widget.orderId));
+
+    // Bật polling khi VIP store + bank_transfer + chưa thanh toán
+    // Tắt ngay khi đã paid hoặc không cần thiết
+    ref.listen<AsyncValue<Map<String, dynamic>>>(
+      orderDetailProvider(widget.orderId),
+      (_, next) => next.whenData((order) {
+        final paymentStatus = order['paymentStatus'] as String? ?? '';
+        final isPaid = paymentStatus == 'paid_full' || paymentStatus == 'cod_collected';
+        final paymentMethod = order['paymentMethod'] as String? ?? '';
+        final isBank = paymentMethod == 'bank_transfer' || paymentMethod == 'fifty_fifty';
+        final storeDetails = order['_storeDetails'] as Map<String, dynamic>?;
+        final isVip = (storeDetails?['vipTier'] as String? ?? 'none') != 'none';
+        if (isVip && isBank && !isPaid) {
+          _startPolling();
+        } else {
+          _stopPolling();
+        }
+      }),
+    );
 
     return Scaffold(
       appBar: AppBar(
