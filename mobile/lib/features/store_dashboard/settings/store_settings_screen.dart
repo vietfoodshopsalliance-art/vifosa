@@ -168,7 +168,7 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
         if (_coverImageUrls.isEmpty && _coverUrl != null && _coverUrl!.isNotEmpty) {
           _coverImageUrls = [_coverUrl!];
         }
-        _coverImageFiles = List.filled(_coverImageUrls.length, null);
+        _coverImageFiles = List<XFile?>.filled(_coverImageUrls.length, null, growable: true);
 
         _emergencyClosed = d['emergencyClosed'] as bool? ?? false;
 

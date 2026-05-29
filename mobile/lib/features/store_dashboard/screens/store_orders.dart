@@ -197,9 +197,14 @@ class StoreOrdersNotifier extends StateNotifier<StoreOrdersState> {
 
     // FCM foreground fallback — khi socket không trong room (vd: sau server restart)
     _fcmSub = FirebaseMessaging.onMessage.listen((message) {
-      if (message.data['type'] == 'new_order' &&
-          message.data['storeId'] == storeId) {
+      final type = message.data['type'];
+      final sid  = message.data['storeId'];
+      if (sid != storeId) return;
+      if (type == 'new_order') {
         _playBell();
+        fetchOrders();
+      } else if (type == 'payment_updated') {
+        _playDing();
         fetchOrders();
       }
     });
