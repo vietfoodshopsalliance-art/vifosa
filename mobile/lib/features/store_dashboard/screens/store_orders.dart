@@ -172,6 +172,7 @@ class StoreOrdersNotifier extends StateNotifier<StoreOrdersState> {
 
   void _subscribeSocket() {
     SocketClient().joinStore(storeId);
+    SocketClient().on('connect', (_) => SocketClient().joinStore(storeId));
     SocketClient().on('new_order', (_) {
       _playBell();
       fetchOrders();
@@ -182,6 +183,7 @@ class StoreOrdersNotifier extends StateNotifier<StoreOrdersState> {
   @override
   void dispose() {
     SocketClient().leaveStore(storeId);
+    SocketClient().off('connect');
     SocketClient().off('new_order');
     SocketClient().off('order_status_changed');
     super.dispose();
