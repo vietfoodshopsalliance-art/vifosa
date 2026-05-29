@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/network/dio_client.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/address_model.dart';
@@ -74,6 +75,11 @@ final _myOrderStatsProvider = FutureProvider.autoDispose<_OrderStats>((ref) asyn
   } catch (_) {
     return const _OrderStats(completed: 0, total: 0);
   }
+});
+
+final _appVersionProvider = FutureProvider.autoDispose<String>((ref) async {
+  final info = await PackageInfo.fromPlatform();
+  return '${info.version}+${info.buildNumber}';
 });
 
 final _myReviewCountProvider = FutureProvider.autoDispose<int>((ref) async {
@@ -222,6 +228,9 @@ class ProfileScreen extends ConsumerWidget {
                 label: 'Hỗ trợ chúng tôi',
                 subtitle: 'Duy trì phần mềm miễn phí, chiết khấu quán 0%',
                 onTap: () => context.push('/profile/support-us'),
+                tileColor: const Color(0xFFFFF3CC),
+                iconBgColor: const Color(0xFFFFE49A),
+                iconColor: const Color(0xFFB87800),
               ),
               const _MenuDivider(),
               _MenuTile(
@@ -247,6 +256,8 @@ class ProfileScreen extends ConsumerWidget {
               child: _LogoutCard(onTap: () => _confirmLogout(context, ref)),
             ),
 
+            const SizedBox(height: 16),
+            _VersionLabel(),
             const SizedBox(height: 32),
           ],
         ),
@@ -675,61 +686,72 @@ class _MenuTile extends StatelessWidget {
   final String label;
   final String? subtitle;
   final VoidCallback onTap;
+  final Color? iconBgColor;
+  final Color? iconColor;
+  final Color? tileColor;
 
   const _MenuTile({
     required this.icon,
     required this.label,
     this.subtitle,
     required this.onTap,
+    this.iconBgColor,
+    this.iconColor,
+    this.tileColor,
   });
 
   @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: _iconBg,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, size: 20, color: const Color(0xFF6B5230)),
+  Widget build(BuildContext context) {
+    final content = InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: iconBgColor ?? _iconBg,
+                borderRadius: BorderRadius.circular(10),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: _txtMain,
-                      ),
+              child: Icon(icon, size: 20, color: iconColor ?? const Color(0xFF6B5230)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: _txtMain,
                     ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 1),
-                      Text(
-                        subtitle!,
-                        style: const TextStyle(fontSize: 12, color: _txtSub),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 1),
+                    Text(
+                      subtitle!,
+                      style: const TextStyle(fontSize: 12, color: _txtSub),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
-                ),
+                ],
               ),
-              const Icon(Icons.chevron_right,
-                  color: Color(0xFFBDB6A8), size: 20),
-            ],
-          ),
+            ),
+            const Icon(Icons.chevron_right, color: Color(0xFFBDB6A8), size: 20),
+          ],
         ),
-      );
+      ),
+    );
+    if (tileColor != null) {
+      return Material(color: tileColor!, child: content);
+    }
+    return content;
+  }
 }
 
 // ── Logout Card ───────────────────────────────────────────────────────────────
@@ -776,6 +798,24 @@ class _LogoutCard extends StatelessWidget {
           ),
         ),
       );
+}
+
+// ── Version Label ─────────────────────────────────────────────────────────────
+
+class _VersionLabel extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final version = ref.watch(_appVersionProvider).maybeWhen(
+          data: (v) => v,
+          orElse: () => '...',
+        );
+    return Center(
+      child: Text(
+        'Version $version',
+        style: const TextStyle(fontSize: 12, color: _txtSub),
+      ),
+    );
+  }
 }
 
 // ── Explore Sheet ─────────────────────────────────────────────────────────────

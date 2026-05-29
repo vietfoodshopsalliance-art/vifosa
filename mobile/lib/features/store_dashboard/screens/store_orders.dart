@@ -18,6 +18,16 @@ import '../models/store_order.dart';
 import '../orders/widgets/order_card_store.dart';
 import '../orders/store_order_detail_screen.dart';
 
+// ─── Error helper ─────────────────────────────────────────────────────────────
+
+String _extractDioError(Object e) {
+  if (e is DioException) {
+    final data = e.response?.data;
+    if (data is Map && data['error'] is String) return data['error'] as String;
+  }
+  return e.toString();
+}
+
 // ─── Simple store info for switcher ──────────────────────────────────────────
 
 class _SimpleStore {
@@ -298,35 +308,42 @@ class StoreOrdersNotifier extends StateNotifier<StoreOrdersState> {
 
   // preparing → delivering
   Future<void> startDelivery(String orderId) async {
-    await DioClient.instance.patch(ApiEndpoints.orderDeliver(orderId), data: {});
-    await fetchOrders();
+    try {
+      await DioClient.instance.patch(ApiEndpoints.orderDeliver(orderId), data: {});
+    } finally {
+      await fetchOrders();
+    }
   }
 
   // delivering → delivered (quán xác nhận "đã trao hàng"); ghi nhận COD nếu có
   Future<void> markDelivered(String orderId) async {
     final order = state.inProgressOrders.where((o) => o.id == orderId).firstOrNull;
-    await DioClient.instance.patch(ApiEndpoints.orderMarkDelivered(orderId), data: {});
-
-    if (order != null &&
-        order.remainingAmount > 0 &&
-        (order.paymentMethod == 'cod' || order.paymentMethod == 'fifty_fifty')) {
-      await DioClient.instance.patch(
-        ApiEndpoints.orderConfirmMoney(orderId),
-        data: {'amount': order.remainingAmount},
-      );
+    try {
+      await DioClient.instance.patch(ApiEndpoints.orderMarkDelivered(orderId), data: {});
+      if (order != null &&
+          order.remainingAmount > 0 &&
+          (order.paymentMethod == 'cod' || order.paymentMethod == 'fifty_fifty')) {
+        await DioClient.instance.patch(
+          ApiEndpoints.orderConfirmMoney(orderId),
+          data: {'amount': order.remainingAmount},
+        );
+      }
+    } finally {
+      await fetchOrders();
+      await _fetchHistory();
     }
-
-    await fetchOrders();
-    await _fetchHistory();
   }
 
   // Kept for backward compat — alias gọi startDelivery (preparing → delivering)
   Future<void> deliverOrder(String orderId) => startDelivery(orderId);
 
   Future<void> returnToPending(String orderId) async {
-    await DioClient.instance
-        .patch(ApiEndpoints.orderReturnToPending(orderId), data: {});
-    await fetchOrders();
+    try {
+      await DioClient.instance
+          .patch(ApiEndpoints.orderReturnToPending(orderId), data: {});
+    } finally {
+      await fetchOrders();
+    }
   }
 
   Future<void> recordPayment(String orderId, double amount) async {
@@ -1005,7 +1022,7 @@ class _InProgressTab extends ConsumerWidget {
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context)
-                      .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                      .showSnackBar(SnackBar(content: Text(_extractDioError(e))));
                 }
               }
             };
@@ -1016,7 +1033,7 @@ class _InProgressTab extends ConsumerWidget {
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context)
-                      .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                      .showSnackBar(SnackBar(content: Text(_extractDioError(e))));
                 }
               }
             };
@@ -1039,7 +1056,7 @@ class _InProgressTab extends ConsumerWidget {
                     } catch (e) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context)
-                            .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                            .showSnackBar(SnackBar(content: Text(_extractDioError(e))));
                       }
                     }
                   }
@@ -1051,7 +1068,7 @@ class _InProgressTab extends ConsumerWidget {
                     } catch (e) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Lỗi: $e')));
+                            SnackBar(content: Text(_extractDioError(e))));
                       }
                     }
                   }
@@ -1072,7 +1089,7 @@ class _InProgressTab extends ConsumerWidget {
         } catch (e) {
           if (context.mounted) {
             ScaffoldMessenger.of(context)
-                .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                .showSnackBar(SnackBar(content: Text(_extractDioError(e))));
           }
         }
       };
@@ -1083,7 +1100,7 @@ class _InProgressTab extends ConsumerWidget {
         } catch (e) {
           if (context.mounted) {
             ScaffoldMessenger.of(context)
-                .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                .showSnackBar(SnackBar(content: Text(_extractDioError(e))));
           }
         }
       };
@@ -1110,7 +1127,7 @@ class _InProgressTab extends ConsumerWidget {
                   } catch (e) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context)
-                          .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                          .showSnackBar(SnackBar(content: Text(_extractDioError(e))));
                     }
                   }
                 }

@@ -74,6 +74,25 @@ class StoreManageScreen extends StatelessWidget {
     }
   }
 
+  void _onNavTap(BuildContext context, int i) {
+    switch (i) {
+      case 0:
+        context.go('/store-dashboard/$storeId/orders');
+        break;
+      case 1:
+        context.pushReplacement('/store-dashboard/$storeId/menu');
+        break;
+      case 2:
+        context.pushReplacement('/store-dashboard/$storeId/reviews');
+        break;
+      case 3:
+        context.pushReplacement('/store-dashboard/$storeId/reports');
+        break;
+      case 4:
+        break; // đã ở trang Quản lý
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -90,12 +109,20 @@ class StoreManageScreen extends StatelessWidget {
             onTap: () => context.push('/store/create'),
           ),
           const SizedBox(height: 12),
-          _ManageCard(
+          const _ManageCard(
             icon: Icons.people_outline,
             title: 'Giao quyền cho nhân viên',
             subtitle: 'Phân quyền nhân viên quản lý cửa hàng',
             badge: 'Đang xây dựng',
             onTap: null,
+          ),
+          const SizedBox(height: 12),
+          _ManageCard(
+            icon: Icons.volunteer_activism_outlined,
+            title: 'Hỗ trợ chúng tôi',
+            subtitle: 'Để duy trì phần mềm miễn phí – Chiết khấu quán 0%',
+            isHighlight: true,
+            onTap: () => context.push('/profile/support-us'),
           ),
           const SizedBox(height: 24),
           const Divider(),
@@ -109,6 +136,37 @@ class StoreManageScreen extends StatelessWidget {
           ),
         ],
       ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: 4,
+        onTap: (i) => _onNavTap(context, i),
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: AppTheme.primary,
+        unselectedItemColor: Colors.grey,
+        selectedFontSize: 11,
+        unselectedFontSize: 11,
+        items: const [
+          BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard_outlined),
+              activeIcon: Icon(Icons.dashboard),
+              label: 'Dashboard'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.restaurant_menu_outlined),
+              activeIcon: Icon(Icons.restaurant_menu),
+              label: 'Menu'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.star_outline),
+              activeIcon: Icon(Icons.star),
+              label: 'Đánh giá'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.bar_chart_outlined),
+              activeIcon: Icon(Icons.bar_chart),
+              label: 'Báo cáo'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.manage_accounts_outlined),
+              activeIcon: Icon(Icons.manage_accounts),
+              label: 'Quản lý'),
+        ],
+      ),
     );
   }
 }
@@ -119,6 +177,7 @@ class _ManageCard extends StatelessWidget {
   final String subtitle;
   final String? badge;
   final bool isDanger;
+  final bool isHighlight;
   final VoidCallback? onTap;
 
   const _ManageCard({
@@ -127,17 +186,51 @@ class _ManageCard extends StatelessWidget {
     required this.subtitle,
     this.badge,
     this.isDanger = false,
+    this.isHighlight = false,
     this.onTap,
   });
 
+  static const _highlightIcon    = Color(0xFFB87800);
+  static const _highlightIconBg  = Color(0xFFFFE49A);
+  static const _highlightTileBg  = Color(0xFFFFF8E6);
+  static const _highlightBorder  = Color(0xFFFFD060);
+
   @override
   Widget build(BuildContext context) {
+    final resolvedIconBg = isDanger
+        ? Colors.red.withValues(alpha: 0.1)
+        : isHighlight
+            ? _highlightIconBg
+            : onTap != null
+                ? AppTheme.primary.withValues(alpha: 0.1)
+                : Colors.grey.shade100;
+
+    final resolvedIconColor = isDanger
+        ? Colors.red
+        : isHighlight
+            ? _highlightIcon
+            : onTap != null
+                ? AppTheme.primary
+                : Colors.grey;
+
+    final resolvedTitleColor = isDanger
+        ? Colors.red
+        : isHighlight
+            ? _highlightIcon
+            : onTap != null
+                ? Colors.black87
+                : Colors.grey.shade500;
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(
+          color: isHighlight ? _highlightBorder : Colors.grey.shade200,
+          width: isHighlight ? 1.5 : 1,
+        ),
       ),
+      color: isHighlight ? _highlightTileBg : null,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
@@ -149,20 +242,12 @@ class _ManageCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: isDanger
-                      ? Colors.red.withValues(alpha: 0.1)
-                      : onTap != null
-                          ? AppTheme.primary.withValues(alpha: 0.1)
-                          : Colors.grey.shade100,
+                  color: resolvedIconBg,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
                   icon,
-                  color: isDanger
-                      ? Colors.red
-                      : onTap != null
-                          ? AppTheme.primary
-                          : Colors.grey,
+                  color: resolvedIconColor,
                   size: 24,
                 ),
               ),
@@ -178,11 +263,7 @@ class _ManageCard extends StatelessWidget {
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 15,
-                            color: isDanger
-                                ? Colors.red
-                                : onTap != null
-                                    ? Colors.black87
-                                    : Colors.grey.shade500,
+                            color: resolvedTitleColor,
                           ),
                         ),
                         if (badge != null) ...[
@@ -196,7 +277,7 @@ class _ManageCard extends StatelessWidget {
                             ),
                             child: Text(
                               badge!,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
                                 color: AppTheme.warning,
