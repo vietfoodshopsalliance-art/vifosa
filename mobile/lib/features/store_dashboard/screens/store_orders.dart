@@ -5,6 +5,7 @@
 
 import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -164,6 +165,7 @@ Future<void> _playBell() async {
 
 class StoreOrdersNotifier extends StateNotifier<StoreOrdersState> {
   final String storeId;
+  StreamSubscription<RemoteMessage>? _fcmSub;
 
   StoreOrdersNotifier(this.storeId) : super(const StoreOrdersState()) {
     _fetchAll();
@@ -178,6 +180,15 @@ class StoreOrdersNotifier extends StateNotifier<StoreOrdersState> {
       fetchOrders();
     });
     SocketClient().on('order_status_changed', (_) => fetchOrders());
+
+    // FCM foreground fallback — khi socket không trong room (vd: sau server restart)
+    _fcmSub = FirebaseMessaging.onMessage.listen((message) {
+      if (message.data['type'] == 'new_order' &&
+          message.data['storeId'] == storeId) {
+        _playBell();
+        fetchOrders();
+      }
+    });
   }
 
   @override
@@ -186,6 +197,7 @@ class StoreOrdersNotifier extends StateNotifier<StoreOrdersState> {
     SocketClient().off('connect');
     SocketClient().off('new_order');
     SocketClient().off('order_status_changed');
+    _fcmSub?.cancel();
     super.dispose();
   }
 
