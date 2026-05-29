@@ -538,13 +538,23 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
     });
   }
 
-  void _addCoverSlot() {
-    if (_coverImageUrls.length >= 5) return;
+  Future<void> _addCoverSlot() async {
+    final available = 5 - _coverImageUrls.length;
+    if (available <= 0) return;
+    final picker = ImagePicker();
+    final files = await picker.pickMultiImage(
+      maxWidth: 1920,
+      maxHeight: 2000,
+      imageQuality: 85,
+      limit: available,
+    );
+    if (files.isEmpty) return;
     setState(() {
-      _coverImageUrls.add('');
-      _coverImageFiles.add(null);
+      for (final f in files) {
+        _coverImageUrls.add('');
+        _coverImageFiles.add(f);
+      }
     });
-    _pickCoverImage(_coverImageUrls.length - 1);
   }
 
   void _removeCoverSlot(int index) {
@@ -582,17 +592,6 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const _SectionHeader('Thông báo'),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: const Text('Chuông thông báo đơn mới'),
-              subtitle: Text(_bellEnabled ? 'Bật — nghe tiếng chuông khi có đơn' : 'Tắt'),
-              value: _bellEnabled,
-              onChanged: _setBellEnabled,
-            ),
-
-            const SizedBox(height: 20),
             const _SectionHeader('Thông tin quán'),
             // Avatar
             Row(
@@ -794,6 +793,17 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
               value: _emergencyClosed,
               activeThumbColor: Colors.red,
               onChanged: _toggleEmergencyClose,
+            ),
+
+            const SizedBox(height: 20),
+            const _SectionHeader('Thông báo'),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: const Text('Chuông thông báo đơn mới'),
+              subtitle: Text(_bellEnabled ? 'Bật — nghe tiếng chuông khi có đơn' : 'Tắt'),
+              value: _bellEnabled,
+              onChanged: _setBellEnabled,
             ),
 
             const SizedBox(height: 20),

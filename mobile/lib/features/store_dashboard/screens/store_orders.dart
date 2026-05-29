@@ -148,9 +148,10 @@ class StoreOrdersState {
 
 const _sentinel = Object();
 
-// ─── Bell player singleton ────────────────────────────────────────────────────
+// ─── Bell / Ding player singletons ───────────────────────────────────────────
 
 final _bellPlayer = AudioPlayer();
+final _dingPlayer = AudioPlayer();
 
 Future<void> _playBell() async {
   final prefs = await SharedPreferences.getInstance();
@@ -158,6 +159,15 @@ Future<void> _playBell() async {
   try {
     await _bellPlayer.stop();
     await _bellPlayer.play(AssetSource('audio/chuong.mp3'));
+  } catch (_) {}
+}
+
+Future<void> _playDing() async {
+  final prefs = await SharedPreferences.getInstance();
+  if (prefs.getBool('bell_enabled') == false) return;
+  try {
+    await _dingPlayer.stop();
+    await _dingPlayer.play(AssetSource('audio/DING.mp3'));
   } catch (_) {}
 }
 
@@ -180,6 +190,10 @@ class StoreOrdersNotifier extends StateNotifier<StoreOrdersState> {
       fetchOrders();
     });
     SocketClient().on('order_status_changed', (_) => fetchOrders());
+    SocketClient().on('order:updated', (_) {
+      _playDing();
+      fetchOrders();
+    });
 
     // FCM foreground fallback — khi socket không trong room (vd: sau server restart)
     _fcmSub = FirebaseMessaging.onMessage.listen((message) {
@@ -197,6 +211,7 @@ class StoreOrdersNotifier extends StateNotifier<StoreOrdersState> {
     SocketClient().off('connect');
     SocketClient().off('new_order');
     SocketClient().off('order_status_changed');
+    SocketClient().off('order:updated');
     _fcmSub?.cancel();
     super.dispose();
   }
