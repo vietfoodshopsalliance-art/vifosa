@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/services/image_service.dart';
+import '../../../core/utils/cloudinary_utils.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -1096,7 +1097,7 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
                   for (int i = 0; i < _existingImages.length; i++)
                     _imageSlot(
                       child: CachedNetworkImage(
-                        imageUrl: ImageService.thumbnail(
+                        imageUrl: cloudinarySquare(
                             _existingImages[i],
                             size: 200),
                         fit: BoxFit.cover,

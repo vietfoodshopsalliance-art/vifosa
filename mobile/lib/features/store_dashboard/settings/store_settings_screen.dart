@@ -1,6 +1,7 @@
 // lib/features/store_dashboard/settings/store_settings_screen.dart
 
 import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/services/image_service.dart' show ImageUploadContext, imageServiceProvider;
+import '../../../core/utils/cloudinary_utils.dart';
 import 'open_hours_editor.dart';
 
 // ─── Vietnamese banks list ────────────────────────────────────────────────────
@@ -102,9 +104,14 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
   bool _loading = false;
   bool _initialLoaded = false;
 
+  // Cover carousel
+  int _coverPage = 0;
+  late final PageController _coverPageCtrl;
+
   @override
   void initState() {
     super.initState();
+    _coverPageCtrl = PageController();
     _loadSettings();
     _loadBellPref();
   }
@@ -124,6 +131,7 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
 
   @override
   void dispose() {
+    _coverPageCtrl.dispose();
     _nameCtrl.dispose();
     _descCtrl.dispose();
     _addressCtrl.dispose();
@@ -549,10 +557,20 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
       limit: available,
     );
     if (files.isEmpty) return;
+    int firstNewIndex = _coverImageUrls.length;
     setState(() {
       for (final f in files) {
         _coverImageUrls.add('');
         _coverImageFiles.add(f);
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_coverPageCtrl.hasClients) {
+        _coverPageCtrl.animateToPage(
+          firstNewIndex,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
       }
     });
   }
@@ -561,6 +579,14 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
     setState(() {
       _coverImageUrls.removeAt(index);
       _coverImageFiles.removeAt(index);
+      if (_coverPage >= _coverImageUrls.length && _coverPage > 0) {
+        _coverPage = _coverImageUrls.length - 1;
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_coverPageCtrl.hasClients && _coverImageUrls.isNotEmpty) {
+        _coverPageCtrl.jumpToPage(_coverPage);
+      }
     });
   }
 
@@ -571,8 +597,285 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
       _coverImageUrls.insert(index - 1, url);
       final file = _coverImageFiles.removeAt(index);
       _coverImageFiles.insert(index - 1, file);
+      _coverPage = index - 1;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_coverPageCtrl.hasClients) {
+        _coverPageCtrl.jumpToPage(_coverPage);
+      }
     });
   }
+
+  // ─── Cover carousel + avatar overlay section ─────────────────────────────
+
+  Widget _buildCoverAvatarSection() {
+    final coverCount = _coverImageUrls.length;
+    final hasCover = coverCount > 0;
+    final canAdd = coverCount < 5;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 220,
+          width: double.infinity,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // ── PageView of cover images ─────────────────────────────────
+              if (!hasCover)
+                GestureDetector(
+                  onTap: _addCoverSlot,
+                  child: Container(
+                    color: Colors.grey.shade200,
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add_photo_alternate_outlined,
+                            size: 48, color: Colors.grey),
+                        SizedBox(height: 8),
+                        Text('Nhấn để thêm ảnh bìa',
+                            style: TextStyle(color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                PageView.builder(
+                  controller: _coverPageCtrl,
+                  onPageChanged: (i) => setState(() => _coverPage = i),
+                  itemCount: coverCount,
+                  itemBuilder: (_, i) {
+                    final fileX = i < _coverImageFiles.length
+                        ? _coverImageFiles[i]
+                        : null;
+                    final url =
+                        i < _coverImageUrls.length ? _coverImageUrls[i] : '';
+                    return GestureDetector(
+                      onTap: () => _pickCoverImage(i),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          if (fileX != null)
+                            Image.file(File(fileX.path), fit: BoxFit.cover)
+                          else if (url.isNotEmpty)
+                            CachedNetworkImage(
+                              imageUrl: cloudinaryDetail(url),
+                              fit: BoxFit.cover,
+                              fadeInDuration:
+                                  const Duration(milliseconds: 250),
+                              placeholder: (_, __) => CachedNetworkImage(
+                                imageUrl: cloudinaryBlur(url),
+                                fit: BoxFit.cover,
+                                fadeInDuration:
+                                    const Duration(milliseconds: 150),
+                                placeholder: (_, __) =>
+                                    Container(color: Colors.grey.shade300),
+                                errorWidget: (_, __, ___) =>
+                                    Container(color: Colors.grey.shade300),
+                              ),
+                              errorWidget: (_, __, ___) => _coverPlaceholder(),
+                            )
+                          else
+                            _coverPlaceholder(),
+                          // Tap-to-change hint
+                          Positioned(
+                            top: 8,
+                            left: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black45,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text('Nhấn để đổi ảnh',
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 11)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+
+              // ── Avatar overlay (bottom-left) ─────────────────────────────
+              Positioned(
+                bottom: coverCount > 1 ? 28 : 12,
+                left: 16,
+                child: GestureDetector(
+                  onTap: () => _pickImage(true),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border:
+                              Border.all(color: Colors.white, width: 2.5),
+                          boxShadow: const [
+                            BoxShadow(
+                                color: Colors.black26, blurRadius: 6)
+                          ],
+                        ),
+                        child: ClipOval(child: _buildAvatarImage()),
+                      ),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).primaryColor,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.camera_alt,
+                              size: 12, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ── Dot indicators ────────────────────────────────────────────
+              if (coverCount > 1)
+                Positioned(
+                  bottom: 8,
+                  left: 0,
+                  right: 0,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      coverCount,
+                      (i) => AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        width: i == _coverPage ? 16 : 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: i == _coverPage
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // ── Action buttons (top-right) ────────────────────────────────
+              if (hasCover)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Row(
+                    children: [
+                      if (_coverPage > 0) ...[
+                        _coverActionBtn(
+                          Icons.arrow_upward,
+                          Colors.amber,
+                          'Lên trước',
+                          () => _moveCoverUp(_coverPage),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      _coverActionBtn(
+                        Icons.delete_outline,
+                        Colors.redAccent,
+                        'Xoá ảnh này',
+                        () => _removeCoverSlot(_coverPage),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+
+        // ── Add cover button & hint ─────────────────────────────────────
+        if (hasCover && canAdd)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: OutlinedButton.icon(
+              onPressed: _addCoverSlot,
+              icon: const Icon(Icons.add_photo_alternate_outlined, size: 16),
+              label: Text('Thêm ảnh bìa ($coverCount/5)'),
+            ),
+          ),
+        if (hasCover && coverCount > 1)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Quẹt để xem các ảnh bìa khác',
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _coverPlaceholder() => Container(
+        color: Colors.grey.shade200,
+        child:
+            const Icon(Icons.store, size: 72, color: Colors.white),
+      );
+
+  Widget _buildAvatarImage() {
+    if (_newAvatar != null) {
+      return Image.file(File(_newAvatar!.path),
+          width: 72, height: 72, fit: BoxFit.cover);
+    }
+    if (_avatarUrl != null && _avatarUrl!.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: cloudinaryThumb(_avatarUrl),
+        width: 72,
+        height: 72,
+        fit: BoxFit.cover,
+        fadeInDuration: const Duration(milliseconds: 200),
+        placeholder: (_, __) => CachedNetworkImage(
+          imageUrl: cloudinaryBlur(_avatarUrl, size: 10),
+          width: 72,
+          height: 72,
+          fit: BoxFit.cover,
+          fadeInDuration: const Duration(milliseconds: 150),
+          placeholder: (_, __) =>
+              Container(width: 72, height: 72, color: Colors.grey.shade300),
+          errorWidget: (_, __, ___) =>
+              Container(width: 72, height: 72, color: Colors.grey.shade300),
+        ),
+        errorWidget: (_, __, ___) => _avatarFallback(),
+      );
+    }
+    return _avatarFallback();
+  }
+
+  Widget _avatarFallback() => CircleAvatar(
+        radius: 36,
+        backgroundColor: Colors.grey.shade300,
+        child: const Icon(Icons.store, size: 28, color: Colors.white),
+      );
+
+  Widget _coverActionBtn(
+      IconData icon, Color color, String tooltip, VoidCallback onTap) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Colors.black54,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Icon(icon, color: color, size: 18),
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -593,108 +896,7 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
           padding: const EdgeInsets.all(16),
           children: [
             const _SectionHeader('Thông tin quán'),
-            // Avatar
-            Row(
-              children: [
-                _ImagePickerTile(
-                  label: 'Ảnh đại diện',
-                  url: _avatarUrl,
-                  file: _newAvatar != null ? File(_newAvatar!.path) : null,
-                  size: 80,
-                  circular: true,
-                  onTap: () => _pickImage(true),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Multiple cover images
-            const Text('Ảnh bìa (tối đa 5, ảnh đầu hiển thị trước)',
-                style: TextStyle(fontSize: 13, color: Colors.grey)),
-            const SizedBox(height: 8),
-            ..._coverImageUrls.asMap().entries.map((entry) {
-              final i = entry.key;
-              final url = entry.value;
-              final file = i < _coverImageFiles.length ? _coverImageFiles[i] : null;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () => _pickCoverImage(i),
-                      child: Container(
-                        width: 100,
-                        height: 70,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          color: Colors.grey.shade200,
-                          image: file != null
-                              ? DecorationImage(
-                                  image: FileImage(File(file.path)),
-                                  fit: BoxFit.cover)
-                              : (url.isNotEmpty
-                                  ? DecorationImage(
-                                      image: NetworkImage(url),
-                                      fit: BoxFit.cover)
-                                  : null),
-                        ),
-                        child: (file == null && url.isEmpty)
-                            ? const Icon(Icons.add_photo_alternate_outlined,
-                                color: Colors.grey, size: 28)
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (i == 0)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.amber.shade100,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text('Ảnh chính',
-                                style: TextStyle(
-                                    fontSize: 11, color: Colors.orange)),
-                          ),
-                        if (i > 0)
-                          TextButton.icon(
-                            onPressed: () => _moveCoverUp(i),
-                            icon: const Icon(Icons.arrow_upward, size: 14),
-                            label: const Text('Lên trước', style: TextStyle(fontSize: 12)),
-                            style: TextButton.styleFrom(
-                              minimumSize: Size.zero,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 4, vertical: 2),
-                            ),
-                          ),
-                        TextButton.icon(
-                          onPressed: () => _removeCoverSlot(i),
-                          icon: const Icon(Icons.delete_outline, size: 14,
-                              color: Colors.red),
-                          label: const Text('Xoá',
-                              style: TextStyle(fontSize: 12, color: Colors.red)),
-                          style: TextButton.styleFrom(
-                            minimumSize: Size.zero,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 4, vertical: 2),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            }),
-            if (_coverImageUrls.length < 5)
-              OutlinedButton.icon(
-                onPressed: _addCoverSlot,
-                icon: const Icon(Icons.add_photo_alternate_outlined, size: 16),
-                label: const Text('Thêm ảnh bìa'),
-              ),
+            _buildCoverAvatarSection(),
             const SizedBox(height: 12),
             TextFormField(
               controller: _nameCtrl,
@@ -1007,60 +1209,6 @@ class _ShipFeeField extends StatelessWidget {
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         ),
-    );
-  }
-}
-class _ImagePickerTile extends StatelessWidget {
-  final String label;
-  final String? url;
-  final File? file;
-  final double size;
-  final bool circular;
-  final VoidCallback onTap;
-
-  const _ImagePickerTile({
-    required this.label,
-    this.url,
-    this.file,
-    required this.size,
-    required this.circular,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    ImageProvider? image;
-    if (file != null) {
-      image = FileImage(file!);
-    } else if (url != null) {
-      image = NetworkImage(url!);
-    }
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              shape: circular ? BoxShape.circle : BoxShape.rectangle,
-              borderRadius: circular ? null : BorderRadius.circular(8),
-              color: Colors.grey.shade200,
-              image: image != null
-                  ? DecorationImage(image: image, fit: BoxFit.cover)
-                  : null,
-            ),
-            child: image == null
-                ? const Icon(Icons.camera_alt_outlined,
-                    color: Colors.grey, size: 28)
-                : null,
-          ),
-          const SizedBox(height: 4),
-          Text(label,
-              style: const TextStyle(fontSize: 11, color: Colors.grey)),
-        ],
-      ),
     );
   }
 }

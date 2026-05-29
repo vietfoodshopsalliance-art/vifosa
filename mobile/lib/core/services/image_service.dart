@@ -101,23 +101,6 @@ class ImageService {
     );
   }
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
-  static String thumbnail(String url, {int size = 400}) {
-    if (!url.contains('/upload/')) return url;
-    return url.replaceFirst(
-      '/upload/',
-      '/upload/w_$size,h_$size,c_fill,f_auto,q_auto/',
-    );
-  }
-
-  static String detail(String url, {int width = 800}) {
-    if (!url.contains('/upload/')) return url;
-    return url.replaceFirst(
-      '/upload/',
-      '/upload/w_$width,f_auto,q_auto/',
-    );
-  }
 }
 
 final imageServiceProvider = Provider<ImageService>((_) => ImageService.instance);

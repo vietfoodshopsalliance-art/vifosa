@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/providers/liked_items_provider.dart';
-import '../../../core/services/image_service.dart';
+import '../../../core/utils/cloudinary_utils.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 import '../models/food_item_card.dart';
 
@@ -315,7 +315,7 @@ class _ItemImage extends StatelessWidget {
 
     if (url == null || url!.isEmpty) return fallback;
 
-    final transformed = ImageService.thumbnail(url!, size: 400);
+    final transformed = cloudinarySquare(url);
 
     return CachedNetworkImage(
       imageUrl: transformed,

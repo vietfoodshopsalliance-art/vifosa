@@ -19,3 +19,11 @@ String cloudinaryThumb(String? url) =>
 /// 800 px — store detail carousel, full-size previews
 String cloudinaryDetail(String? url) =>
     cloudinaryUrl(url, transform: 'f_auto,q_auto,w_800');
+
+/// Square NxN with c_fill — food cards, menu thumbnails (consistent grid layout)
+String cloudinarySquare(String? url, {int size = 400}) =>
+    cloudinaryUrl(url, transform: 'w_$size,h_$size,c_fill,f_auto,q_auto');
+
+/// Ultra-small blur — load-in-place placeholder (<1 KB, ~instant)
+String cloudinaryBlur(String? url, {int size = 20}) =>
+    cloudinaryUrl(url, transform: 'w_$size,q_10,e_blur:400');

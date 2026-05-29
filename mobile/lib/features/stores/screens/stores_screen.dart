@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/providers/liked_stores_provider.dart';
-import '../../../core/services/image_service.dart';
+import '../../../core/utils/cloudinary_utils.dart';
 import '../../../core/widgets/avatar_menu_button.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../home/models/store_card.dart';
@@ -56,14 +56,20 @@ class _StoresScreenState extends ConsumerState<StoresScreen> {
     final nearbyState = ref.watch(nearbyStoresProvider);
     final feedAsync = ref.watch(homeFeedDataProvider(_kRadius));
 
-    // Xây danh sách theo thứ tự ưu tiên
-    final newStores = feedAsync.valueOrNull?.newStores ?? [];
-    final topNew = newStores.take(2).toList();
-    final newIds = topNew.map((s) => s.id).toSet();
-    final nearbyFiltered = nearbyState.stores
-        .where((s) => !newIds.contains(s.id))
-        .toList();
-    final allStores = [...topNew, ...nearbyFiltered];
+    // Gom tất cả nhóm (new, trending, recent, favorites, nearby), dedup theo ID
+    final feedData = feedAsync.valueOrNull;
+    final seenIds = <String>{};
+    final allStores = [
+      ...(feedData?.newStores ?? []).take(2),
+      ...(feedData?.trendingStores ?? []),
+      ...(feedData?.recentPurchases ?? []),
+      ...(feedData?.favorites ?? []),
+      ...nearbyState.stores,
+    ].where((s) {
+      if (seenIds.contains(s.id)) return false;
+      seenIds.add(s.id);
+      return true;
+    }).toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F2E8),
@@ -577,7 +583,7 @@ class _StoreImage extends StatelessWidget {
     );
 
     if (url == null || url!.isEmpty) return fallback;
-    final transformed = ImageService.thumbnail(url!, size: 400);
+    final transformed = cloudinarySquare(url);
 
     return CachedNetworkImage(
       imageUrl: transformed,
