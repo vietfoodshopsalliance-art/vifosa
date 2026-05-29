@@ -4,6 +4,7 @@
 // Bottom nav: Dashboard / Menu / Đánh giá / Báo cáo / Quản lý
 
 import 'dart:async';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -146,6 +147,19 @@ class StoreOrdersState {
 
 const _sentinel = Object();
 
+// ─── Bell player singleton ────────────────────────────────────────────────────
+
+final _bellPlayer = AudioPlayer();
+
+Future<void> _playBell() async {
+  final prefs = await SharedPreferences.getInstance();
+  if (prefs.getBool('bell_enabled') == false) return;
+  try {
+    await _bellPlayer.stop();
+    await _bellPlayer.play(AssetSource('audio/chuong.mp3'));
+  } catch (_) {}
+}
+
 // ─── Notifier ─────────────────────────────────────────────────────────────────
 
 class StoreOrdersNotifier extends StateNotifier<StoreOrdersState> {
@@ -158,7 +172,10 @@ class StoreOrdersNotifier extends StateNotifier<StoreOrdersState> {
 
   void _subscribeSocket() {
     SocketClient().joinStore(storeId);
-    SocketClient().on('new_order', (_) => fetchOrders());
+    SocketClient().on('new_order', (_) {
+      _playBell();
+      fetchOrders();
+    });
     SocketClient().on('order_status_changed', (_) => fetchOrders());
   }
 

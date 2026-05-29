@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/services/image_service.dart' show ImageUploadContext, imageServiceProvider;
@@ -58,8 +59,13 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
   final _phoneCtrl = TextEditingController();
   String? _avatarUrl;
   String? _coverUrl;
+  // Multiple cover images: existing URLs + new local files (null = keep existing)
+  List<String> _coverImageUrls = [];
+  List<XFile?> _coverImageFiles = [];
   XFile? _newAvatar;
-  XFile? _newCover;
+
+  // Notification settings
+  bool _bellEnabled = true;
 
   // Open hours
   Map<String, DayHours> _openHours = {};
@@ -100,6 +106,20 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
   void initState() {
     super.initState();
     _loadSettings();
+    _loadBellPref();
+  }
+
+  Future<void> _loadBellPref() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() => _bellEnabled = prefs.getBool('bell_enabled') ?? true);
+    }
+  }
+
+  Future<void> _setBellEnabled(bool v) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('bell_enabled', v);
+    if (mounted) setState(() => _bellEnabled = v);
   }
 
   @override
@@ -140,6 +160,15 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
         // Fix 1: đúng key
         _avatarUrl = d['avatarImage'] as String?;
         _coverUrl = d['coverImage'] as String?;
+
+        // Multiple cover images
+        final rawCovers = d['coverImages'] as List? ?? [];
+        _coverImageUrls = rawCovers.whereType<String>().toList();
+        // If no array yet but legacy single cover exists, pre-populate
+        if (_coverImageUrls.isEmpty && _coverUrl != null && _coverUrl!.isNotEmpty) {
+          _coverImageUrls = [_coverUrl!];
+        }
+        _coverImageFiles = List.filled(_coverImageUrls.length, null);
 
         _emergencyClosed = d['emergencyClosed'] as bool? ?? false;
 
@@ -199,7 +228,6 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
     try {
       final imageService = ref.read(imageServiceProvider);
       String? avatarUrl = _avatarUrl;
-      String? coverUrl = _coverUrl;
       if (_newAvatar != null) {
         final result = await imageService.uploadFile(
           File(_newAvatar!.path),
@@ -207,12 +235,20 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
         );
         avatarUrl = result.url;
       }
-      if (_newCover != null) {
-        final result = await imageService.uploadFile(
-          File(_newCover!.path),
-          context: ImageUploadContext.storeCover,
-        );
-        coverUrl = result.url;
+
+      // Upload new cover images (slots where user picked a new file)
+      final finalCoverUrls = <String>[];
+      for (int i = 0; i < _coverImageUrls.length; i++) {
+        final newFile = i < _coverImageFiles.length ? _coverImageFiles[i] : null;
+        if (newFile != null) {
+          final result = await imageService.uploadFile(
+            File(newFile.path),
+            context: ImageUploadContext.storeCover,
+          );
+          finalCoverUrls.add(result.url);
+        } else {
+          finalCoverUrls.add(_coverImageUrls[i]);
+        }
       }
 
       await DioClient.instance.patch(
@@ -231,7 +267,9 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
               },
             },
           if (avatarUrl != null) 'avatarImage': avatarUrl,
-          if (coverUrl != null) 'coverImage': coverUrl,
+          // Primary cover = first in array (also update legacy field for compat)
+          if (finalCoverUrls.isNotEmpty) 'coverImage': finalCoverUrls.first,
+          'coverImages': finalCoverUrls,
           // Thêm dayOfWeek vào mỗi entry (backend required: true)
           'openingHours': _openHours.entries.map((e) => {
             'dayOfWeek': _dayOfWeekMap[e.key] ?? 0,
@@ -473,14 +511,56 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
   Future<void> _pickImage(bool isAvatar) async {
     final picker = ImagePicker();
     final file = await picker.pickImage(
-        source: ImageSource.gallery, imageQuality: 80);
+      source: ImageSource.gallery,
+      maxWidth: 2000,
+      maxHeight: 2000,
+      imageQuality: 85,
+    );
+    if (file == null) return;
+    if (isAvatar) {
+      setState(() => _newAvatar = file);
+    }
+  }
+
+  Future<void> _pickCoverImage(int index) async {
+    final picker = ImagePicker();
+    final file = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 2000,
+      maxHeight: 2000,
+      imageQuality: 85,
+    );
     if (file == null) return;
     setState(() {
-      if (isAvatar) {
-        _newAvatar = file;
-      } else {
-        _newCover = file;
+      if (index < _coverImageFiles.length) {
+        _coverImageFiles[index] = file;
       }
+    });
+  }
+
+  void _addCoverSlot() {
+    if (_coverImageUrls.length >= 5) return;
+    setState(() {
+      _coverImageUrls.add('');
+      _coverImageFiles.add(null);
+    });
+    _pickCoverImage(_coverImageUrls.length - 1);
+  }
+
+  void _removeCoverSlot(int index) {
+    setState(() {
+      _coverImageUrls.removeAt(index);
+      _coverImageFiles.removeAt(index);
+    });
+  }
+
+  void _moveCoverUp(int index) {
+    if (index <= 0) return;
+    setState(() {
+      final url = _coverImageUrls.removeAt(index);
+      _coverImageUrls.insert(index - 1, url);
+      final file = _coverImageFiles.removeAt(index);
+      _coverImageFiles.insert(index - 1, file);
     });
   }
 
@@ -502,8 +582,19 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            const _SectionHeader('Thông báo'),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: const Text('Chuông thông báo đơn mới'),
+              subtitle: Text(_bellEnabled ? 'Bật — nghe tiếng chuông khi có đơn' : 'Tắt'),
+              value: _bellEnabled,
+              onChanged: _setBellEnabled,
+            ),
+
+            const SizedBox(height: 20),
             const _SectionHeader('Thông tin quán'),
-            // Avatar & Cover
+            // Avatar
             Row(
               children: [
                 _ImagePickerTile(
@@ -514,19 +605,97 @@ class _StoreSettingsScreenState extends ConsumerState<StoreSettingsScreen> {
                   circular: true,
                   onTap: () => _pickImage(true),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _ImagePickerTile(
-                    label: 'Ảnh bìa',
-                    url: _coverUrl,
-                    file: _newCover != null ? File(_newCover!.path) : null,
-                    size: 80,
-                    circular: false,
-                    onTap: () => _pickImage(false),
-                  ),
-                ),
               ],
             ),
+            const SizedBox(height: 12),
+
+            // Multiple cover images
+            const Text('Ảnh bìa (tối đa 5, ảnh đầu hiển thị trước)',
+                style: TextStyle(fontSize: 13, color: Colors.grey)),
+            const SizedBox(height: 8),
+            ..._coverImageUrls.asMap().entries.map((entry) {
+              final i = entry.key;
+              final url = entry.value;
+              final file = i < _coverImageFiles.length ? _coverImageFiles[i] : null;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => _pickCoverImage(i),
+                      child: Container(
+                        width: 100,
+                        height: 70,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.grey.shade200,
+                          image: file != null
+                              ? DecorationImage(
+                                  image: FileImage(File(file.path)),
+                                  fit: BoxFit.cover)
+                              : (url.isNotEmpty
+                                  ? DecorationImage(
+                                      image: NetworkImage(url),
+                                      fit: BoxFit.cover)
+                                  : null),
+                        ),
+                        child: (file == null && url.isEmpty)
+                            ? const Icon(Icons.add_photo_alternate_outlined,
+                                color: Colors.grey, size: 28)
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (i == 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade100,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text('Ảnh chính',
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.orange)),
+                          ),
+                        if (i > 0)
+                          TextButton.icon(
+                            onPressed: () => _moveCoverUp(i),
+                            icon: const Icon(Icons.arrow_upward, size: 14),
+                            label: const Text('Lên trước', style: TextStyle(fontSize: 12)),
+                            style: TextButton.styleFrom(
+                              minimumSize: Size.zero,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 4, vertical: 2),
+                            ),
+                          ),
+                        TextButton.icon(
+                          onPressed: () => _removeCoverSlot(i),
+                          icon: const Icon(Icons.delete_outline, size: 14,
+                              color: Colors.red),
+                          label: const Text('Xoá',
+                              style: TextStyle(fontSize: 12, color: Colors.red)),
+                          style: TextButton.styleFrom(
+                            minimumSize: Size.zero,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 2),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
+            if (_coverImageUrls.length < 5)
+              OutlinedButton.icon(
+                onPressed: _addCoverSlot,
+                icon: const Icon(Icons.add_photo_alternate_outlined, size: 16),
+                label: const Text('Thêm ảnh bìa'),
+              ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _nameCtrl,

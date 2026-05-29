@@ -7,6 +7,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../../../core/models/store.dart';
 import '../../../core/models/review.dart';
+import '../../../core/utils/cloudinary_utils.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/item_card.dart';
 import '../store_detail_provider.dart';
@@ -14,15 +15,29 @@ import '../../cart/screens/cart_screen.dart' show cartProvider;
 import '../../auth/providers/auth_provider.dart';
 import '../../order/screens/guest_checkout_screen.dart' show GuestCheckoutArgs;
 
-class StoreDetailScreen extends ConsumerWidget {
+class StoreDetailScreen extends ConsumerStatefulWidget {
   final String storeId;
   const StoreDetailScreen({super.key, required this.storeId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final storeAsync = ref.watch(storeDetailProvider(storeId));
-    final menuAsync  = ref.watch(storeMenuProvider(storeId));
-    final likedAsync = ref.watch(storeLikeProvider(storeId));
+  ConsumerState<StoreDetailScreen> createState() => _StoreDetailScreenState();
+}
+
+class _StoreDetailScreenState extends ConsumerState<StoreDetailScreen> {
+  final _coverPageCtrl = PageController();
+  int _coverPage = 0;
+
+  @override
+  void dispose() {
+    _coverPageCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final storeAsync = ref.watch(storeDetailProvider(widget.storeId));
+    final menuAsync  = ref.watch(storeMenuProvider(widget.storeId));
+    final likedAsync = ref.watch(storeLikeProvider(widget.storeId));
     final totalItems = ref.watch(cartProvider).totalItems;
     final theme = Theme.of(context);
 
@@ -30,57 +45,18 @@ class StoreDetailScreen extends ConsumerWidget {
       body: storeAsync.when(
         data: (store) => CustomScrollView(
           slivers: [
-            // ── Cover image app bar ────────────────────────────────────
+            // ── Cover carousel app bar ─────────────────────────────────
             SliverAppBar(
               expandedHeight: 200,
               pinned: true,
               flexibleSpace: FlexibleSpaceBar(
-                background: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Cover image
-                    store.coverImage != null && store.coverImage!.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: store.coverImage!,
-                            fit: BoxFit.cover,
-                          )
-                        : Container(
-                            color: theme.colorScheme.primary.withOpacity(0.3),
-                            child: const Icon(Icons.store,
-                                size: 72, color: Colors.white),
-                          ),
-                    // Avatar overlay — góc dưới bên trái
-                    if (store.avatarImage != null &&
-                        store.avatarImage!.isNotEmpty)
-                      Positioned(
-                        bottom: 12,
-                        left: 16,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border:
-                                Border.all(color: Colors.white, width: 2.5),
-                            boxShadow: const [
-                              BoxShadow(color: Colors.black26, blurRadius: 6)
-                            ],
-                          ),
-                          child: ClipOval(
-                            child: CachedNetworkImage(
-                              imageUrl: store.avatarImage!,
-                              width: 64,
-                              height: 64,
-                              fit: BoxFit.cover,
-                              errorWidget: (_, __, ___) => CircleAvatar(
-                                radius: 32,
-                                backgroundColor: Colors.grey.shade300,
-                                child: const Icon(Icons.store,
-                                    size: 28, color: Colors.white),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
+                background: _CoverCarousel(
+                  images: store.allCoverImages,
+                  avatarImage: store.avatarImage,
+                  pageCtrl: _coverPageCtrl,
+                  currentPage: _coverPage,
+                  onPageChanged: (p) => setState(() => _coverPage = p),
+                  placeholderColor: theme.colorScheme.primary.withOpacity(0.3),
                 ),
               ),
               actions: [
@@ -94,7 +70,7 @@ class StoreDetailScreen extends ConsumerWidget {
                         : Colors.white,
                   ),
                   onPressed: () =>
-                      ref.read(storeLikeProvider(storeId).notifier).toggle(),
+                      ref.read(storeLikeProvider(widget.storeId).notifier).toggle(),
                 ),
               ],
             ),
@@ -131,7 +107,7 @@ class StoreDetailScreen extends ConsumerWidget {
                       ),
                     const SizedBox(height: 12),
                     GestureDetector(
-                      onTap: () => _showReviews(context, ref, storeId),
+                      onTap: () => _showReviews(context, ref, widget.storeId),
                       child: Row(
                         children: [
                           const Icon(Icons.star, color: Colors.amber, size: 18),
@@ -186,7 +162,7 @@ class StoreDetailScreen extends ConsumerWidget {
                     ],
                     const Divider(height: 24),
                     GestureDetector(
-                      onTap: () => _showReviews(context, ref, storeId),
+                      onTap: () => _showReviews(context, ref, widget.storeId),
                       child: const Row(
                         children: [
                           Icon(Icons.rate_review_outlined, size: 18),
@@ -235,7 +211,7 @@ class StoreDetailScreen extends ConsumerWidget {
                           ),
                           ...cat.items.map((item) => ItemCard(
                                 item: item,
-                                storeId: storeId,
+                                storeId: widget.storeId,
                                 storeName: store.name,
                                 storeStatus: store.displayStatus,
                               )),
@@ -270,7 +246,7 @@ class StoreDetailScreen extends ConsumerWidget {
             children: [
               const Text('Không thể tải thông tin cửa hàng'),
               TextButton(
-                onPressed: () => ref.invalidate(storeDetailProvider(storeId)),
+                onPressed: () => ref.invalidate(storeDetailProvider(widget.storeId)),
                 child: const Text('Thử lại'),
               ),
             ],
@@ -286,7 +262,7 @@ class StoreDetailScreen extends ConsumerWidget {
           onPressed: () => _onCheckoutTap(
             context,
             ref,
-            storeId,
+            widget.storeId,
             storeAsync.valueOrNull?.name ?? '',
           ),
           icon: const Icon(Icons.shopping_cart),
@@ -426,6 +402,108 @@ class StoreDetailScreen extends ConsumerWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _ReviewsSheet(storeId: id),
+    );
+  }
+}
+
+// ── Cover image carousel ──────────────────────────────────────────────────────
+
+class _CoverCarousel extends StatelessWidget {
+  final List<String> images;
+  final String? avatarImage;
+  final PageController pageCtrl;
+  final int currentPage;
+  final ValueChanged<int> onPageChanged;
+  final Color placeholderColor;
+
+  const _CoverCarousel({
+    required this.images,
+    this.avatarImage,
+    required this.pageCtrl,
+    required this.currentPage,
+    required this.onPageChanged,
+    required this.placeholderColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // ── PageView of cover images ───────────────────────────────────
+        images.isEmpty
+            ? Container(
+                color: placeholderColor,
+                child: const Icon(Icons.store, size: 72, color: Colors.white),
+              )
+            : PageView.builder(
+                controller: pageCtrl,
+                onPageChanged: onPageChanged,
+                itemCount: images.length,
+                itemBuilder: (_, i) => CachedNetworkImage(
+                  imageUrl: cloudinaryDetail(images[i]),
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(color: Colors.grey.shade300),
+                  errorWidget: (_, __, ___) => Container(
+                    color: placeholderColor,
+                    child: const Icon(Icons.store, size: 72, color: Colors.white),
+                  ),
+                ),
+              ),
+
+        // ── Avatar overlay ────────────────────────────────────────────
+        if (avatarImage != null && avatarImage!.isNotEmpty)
+          Positioned(
+            bottom: images.length > 1 ? 28 : 12,
+            left: 16,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2.5),
+                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
+              ),
+              child: ClipOval(
+                child: CachedNetworkImage(
+                  imageUrl: cloudinaryThumb(avatarImage),
+                  width: 64,
+                  height: 64,
+                  fit: BoxFit.cover,
+                  errorWidget: (_, __, ___) => CircleAvatar(
+                    radius: 32,
+                    backgroundColor: Colors.grey.shade300,
+                    child: const Icon(Icons.store, size: 28, color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+        // ── Dot indicators ────────────────────────────────────────────
+        if (images.length > 1)
+          Positioned(
+            bottom: 8,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                images.length,
+                (i) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: i == currentPage ? 16 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: i == currentPage
+                        ? Colors.white
+                        : Colors.white.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

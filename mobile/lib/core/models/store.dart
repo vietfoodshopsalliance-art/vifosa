@@ -115,6 +115,7 @@ class Store {
   final String name;
   final String? description;
   final String? coverImage;
+  final List<String> coverImages;
   final String? avatarImage;
   final String addressText;
   final double? lat;
@@ -137,6 +138,7 @@ class Store {
     required this.name,
     this.description,
     this.coverImage,
+    this.coverImages = const [],
     this.avatarImage,
     required this.addressText,
     this.lat,
@@ -166,6 +168,9 @@ class Store {
       name: j['name'] as String? ?? '',
       description: j['description'] as String?,
       coverImage: j['coverImage'] as String?,
+      coverImages: (j['coverImages'] as List<dynamic>? ?? [])
+          .whereType<String>()
+          .toList(),
       avatarImage: j['avatarImage'] as String?,
       addressText: address['text'] as String? ?? '',
       lat: coords.length >= 2 ? coords[1] : null,
@@ -197,6 +202,14 @@ class Store {
   }
 
   // ── Computed ──────────────────────────────────────────────────────────────
+
+  /// Trả về danh sách ảnh bìa để hiển thị carousel.
+  /// Ưu tiên `coverImages`, fallback về `coverImage` nếu mảng rỗng.
+  List<String> get allCoverImages {
+    if (coverImages.isNotEmpty) return coverImages;
+    if (coverImage != null && coverImage!.isNotEmpty) return [coverImage!];
+    return [];
+  }
 
   StoreStatus get displayStatus {
     if (emergencyClosed || isSuspended) return StoreStatus.emergencyClosed;
