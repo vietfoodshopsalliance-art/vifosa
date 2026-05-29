@@ -57,7 +57,7 @@ class AuthRepository {
   }
 
   Future<void> saveFcmToken(String token) async {
-    await _dio.post(ApiEndpoints.fcmToken, data: {'token': token});
+    await _dio.post(ApiEndpoints.fcmToken, data: {'fcmToken': token});
   }
 
   Future<void> _saveTokens(Map<String, dynamic> data) async {
